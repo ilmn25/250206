@@ -1,0 +1,12 @@
+addParking -member_A 2025-05-10 09:00 2.0 8;
+addReservation -member_B 2025-05-14 08:00 3.0 12 battery cable;
+bookEssentials -member_B 2025-05-15 13:00 2.0 battery;
+addEvent -member_E 2025-05-16 14:00 2.0 15 locker umberalla;
+importBatch -batch001.dat;
+bookEssentials -member_C 2025-05-011 13:00 2.0 battery;
+printBookings -fcfs;
+printBookings -prio;
+importBatch -batch099.dat;
+addParking -member_A 2025-05-16 10:00 3.0 9 battery cable;
+printBookings -ALL;
+endProgram;
