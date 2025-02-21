@@ -67,18 +67,18 @@ int main() {
         exit(1);
     }
     else if (pid == 0) {
-        close(fd[1]); // Close child out
-        // Read
-
         close(fd[0]); // Close child in
-    }
-    else {
-        close(fd[0]); // Close parent in
         // Write
 
-        close(fd[1]); // Close parent out
+        close(fd[1]); // Close child out
     }
-    
+    else {
+        close(fd[1]); // Close parent out
+        // Read
+
+        close(fd[0]); // Close parent in
+    }
+
     printf("~~ WELCOME TO PolyU ~~\n");
     while (true) { 
         
