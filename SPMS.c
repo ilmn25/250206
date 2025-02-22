@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 char COMMAND[10][100];
 
@@ -55,30 +58,6 @@ void printBookings() {
 }
 
 int main() {
-    int fd[2], pid;
-
-    if (pipe(fd) < 0) {
-        printf("Pipe created error\n");
-        exit(1);
-    }
-    pid = fork();
-    if (pid < 0) {
-        printf("Fork failed\n");
-        exit(1);
-    }
-    else if (pid == 0) {
-        close(fd[0]); // Close child in
-        // Write
-
-        close(fd[1]); // Close child out
-    }
-    else {
-        close(fd[1]); // Close parent out
-        // Read
-
-        close(fd[0]); // Close parent in
-    }
-
     printf("~~ WELCOME TO PolyU ~~\n");
     while (true) { 
         
@@ -86,22 +65,46 @@ int main() {
         
         getInput();
         
-        if (strcmp(COMMAND[0], "endProgram") == 0) {
-            break;
-        } else if (strcmp(COMMAND[0], "addParking") == 0) { 
-            addParking();
-        } else if (strcmp(COMMAND[0], "addReservation") == 0) { 
-            addReservation();
-        } else if (strcmp(COMMAND[0], "bookEssentials") == 0) { 
-            bookEssentials();
-        } else if (strcmp(COMMAND[0], "addEvent") == 0) { 
-            addEvent();
-        } else if (strcmp(COMMAND[0], "importBatch") == 0) { 
-            importBatch();
-        } else if (strcmp(COMMAND[0], "printBookings") == 0) { 
-            printBookings();
-        } else {
-            printf("invalid, entered: %s\n", COMMAND[0]);
+        int fd[2], pid;
+
+        if (pipe(fd) < 0) {
+            printf("Pipe created error\n");
+            exit(1);
+        }
+        pid = fork();
+        if (pid < 0) {
+            printf("Fork failed\n");
+            exit(1);
+        }
+        else if (pid == 0) {
+            close(fd[0]); // Close child in
+            // Write
+            if (strcmp(COMMAND[0], "endProgram") == 0) {
+                break;
+            } else if (strcmp(COMMAND[0], "addParking") == 0) { 
+                addParking();
+            } else if (strcmp(COMMAND[0], "addReservation") == 0) { 
+                addReservation();
+            } else if (strcmp(COMMAND[0], "bookEssentials") == 0) { 
+                bookEssentials();
+            } else if (strcmp(COMMAND[0], "addEvent") == 0) { 
+                addEvent();
+            } else if (strcmp(COMMAND[0], "importBatch") == 0) { 
+                importBatch();
+            } else if (strcmp(COMMAND[0], "printBookings") == 0) { 
+                printBookings();
+            } else {
+                printf("invalid, entered: %s\n", COMMAND[0]);
+            }
+            close(fd[1]); // Close child out
+            exit(0);
+        }
+        else {
+            close(fd[1]); // Close parent out
+            // Read
+
+            close(fd[0]); // Close parent in
+            wait(NULL);
         }
     }
     
