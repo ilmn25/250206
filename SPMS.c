@@ -34,27 +34,27 @@ bool checkArgCount(int count) {
 }
 
 void addParking() {
-    printf("addParking"); 
+    printf("addParking\n"); 
 }
 
 void addReservation() {
-    printf("addReservation"); 
+    printf("addReservation\n"); 
 }
 
 void bookEssentials() {
-    printf("bookEssentials"); 
+    printf("bookEssentials\n"); 
 }
 
 void addEvent() {
-    printf("addEvent"); 
+    printf("addEvent\n"); 
 }
 
 void importBatch() {
-    printf("importBatch"); 
+    printf("importBatch\n"); 
 }
 
 void printBookings() {
-    printf("printBookings"); 
+    printf("printBookings\n"); 
 }
 
 int main() {
@@ -80,7 +80,7 @@ int main() {
             close(fd[0]); // Close child in
             // Write
             if (strcmp(COMMAND[0], "endProgram") == 0) {
-                break;
+                write(fd[1], "end", 3); // Tell parent to end the program
             } else if (strcmp(COMMAND[0], "addParking") == 0) { 
                 addParking();
             } else if (strcmp(COMMAND[0], "addReservation") == 0) { 
@@ -102,7 +102,11 @@ int main() {
         else {
             close(fd[1]); // Close parent out
             // Read
-
+            char buff[4];
+            read(fd[0], buff, 4); // Read whether child needs to end the program
+            if (strcmp(buff, "end") == 0) {
+                break;
+            }
             close(fd[0]); // Close parent in
             wait(NULL);
         }
