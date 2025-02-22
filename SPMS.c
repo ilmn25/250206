@@ -7,6 +7,15 @@
 
 char COMMAND[10][100];
 
+// Tentative
+int lCount = 3; // Lockers count
+int uCount = 3; // Umbrellas count
+int bCount = 3; // Batteries count
+int cCount = 3; // Cables count
+int vCount = 3; // Valet parking count
+int iCount = 3; // Inflation services count
+float parkingInfo[10][6]; // 10 parking spaces and 6 info (YYYYMMDD, HHMM, Duration (t.t), Member A to E (1 - 5), Priority (1: Event, 2: Reservation, 3: Parking), Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved))
+
 void getInput() {
     char input[100];
     scanf(" %[^\n]", input); //get
