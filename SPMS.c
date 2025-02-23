@@ -7,14 +7,30 @@
 
 char COMMAND[10][100];
 
-// Tentative
-int lCount = 3; // Lockers count
-int uCount = 3; // Umbrellas count
-int bCount = 3; // Batteries count
-int cCount = 3; // Cables count
-int vCount = 3; // Valet parking count
-int iCount = 3; // Inflation services count
-float parkingInfo[10][6]; // 10 parking spaces and 6 info (YYYYMMDD, HHMM, Duration (t.t), Member A to E (1 - 5), Priority (1: Event, 2: Reservation, 3: Parking), Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved))
+// Using linked list to store the parking information
+typedef struct parkingInfo {
+    int date; // YYYYMMDD
+    int time; // HHMM
+    float duration; // Duration (t.t hours)
+    int member; // Member A to E (1 - 5)
+    int priority; // Priority (1: Event, 2: Reservation, 3: Parking)
+    int essentials; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
+    struct parkingInfo *next;
+} parkingInfo;
+
+// Using linked list to store the member booking records
+typedef struct memberRecord {
+    int member; // Member A to E (1 - 5)
+    int date; // YYYYMMDD
+    int time; // HHMM
+    float duration; // Duration (t.t hours)
+    int priority; // Priority (1: Event, 2: Reservation, 3: Parking)
+    int essentials; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
+    bool accepted; // Accepted or not
+    struct memberRecord *next;
+} memberRecord;
+
+// Variables to handle the count of remaining essentials or parking spaces at corresponding time slot (Thinking)
 
 void getInput() {
     char input[100];
