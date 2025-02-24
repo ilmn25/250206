@@ -7,28 +7,19 @@
 
 char COMMAND[10][100];
 
-// Using linked list to store the parking information
-typedef struct parkingInfo {
+// Using linked list to store the booking information
+typedef struct bookingInfo {
     int date; // YYYYMMDD
     int time; // HHMM
     float duration; // Duration (t.t hours)
     int member; // Member A to E (1 - 5)
-    int priority; // Priority (1: Event, 2: Reservation, 3: Parking)
+    int priority; // Priority (1: Event, 2: Reservation, 3: Parking, 4: Essentials)
     int essentials; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
-    struct parkingInfo *next;
-} parkingInfo;
-
-// Using linked list to store the member booking records
-typedef struct memberRecord {
-    int member; // Member A to E (1 - 5)
-    int date; // YYYYMMDD
-    int time; // HHMM
-    float duration; // Duration (t.t hours)
-    int priority; // Priority (1: Event, 2: Reservation, 3: Parking)
-    int essentials; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
-    bool accepted; // Accepted or not
-    struct memberRecord *next;
-} memberRecord;
+    bool fAccepted; // Accepted or not (First Come First Served)
+    bool pAccepted; // Accepted or not (Priority)
+    bool oAccepted; // Accepted or not (Optimized)
+    struct bookingInfo *next;
+} bookingInfo;
 
 // Variables to handle the count of remaining essentials or parking spaces at corresponding time slot (Thinking)
 
