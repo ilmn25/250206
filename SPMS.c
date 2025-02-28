@@ -23,6 +23,24 @@ typedef struct bookingInfo {
 
 bookingInfo *head = NULL;
 
+// NOT WORKING FOR BATCH YET, BECAUSE THIS CHECK IS CALLED BEFORE PREVIOUS BOOKING GETS LINKED
+bool isOverlapTime(int date, int time, float duration) {
+    bookingInfo *cur = head;
+    while (cur != NULL) {
+        if (cur->date == date) {
+            int curEndTime = cur->time + (int)(cur->duration * 100);
+            int targetEndTime = time + (int)(duration * 100);
+            if ((time >= cur->time && time < curEndTime) || 
+                (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
+                (time <= cur->time && targetEndTime >= curEndTime)) {
+                return true;
+            }
+        }
+        cur = cur->next;
+    }
+    return false;
+} 
+
 // Function to insert a booking into the sorted linked list
 void insertIntoSortedList(bookingInfo **head, bookingInfo *newBooking) {
     bookingInfo *cur = *head;
@@ -187,7 +205,7 @@ bookingInfo* createBooking() {
         return NULL;
     } 
 
-    newBooking->fAccepted = false; // Further determined by the system
+    newBooking->fAccepted = !isOverlapTime(newBooking->date, newBooking->time, newBooking->duration); // Further determined by the system
     newBooking->pAccepted = false; // Further determined by the system
     newBooking->oAccepted = false; // Further determined by the system
 
@@ -258,12 +276,19 @@ void importBatch(const char *filename, int fd) {
 
 // (Tentative) Code for viewing the booking information (Tentative)
 void printBookings() {
-    bookingInfo *current = head;
-    while (current != NULL) {
-        printf("Date: %d, Time: %d, Duration: %.1f, Member: %d, Priority: %d, Essentials: %s, fAccepted: %s, pAccepted: %s, oAccepted: %s\n",
-               current->date, current->time, current->duration, current->member, current->priority, current->essentials,
-               current->fAccepted ? "true" : "false", current->pAccepted ? "true" : "false", current->oAccepted ? "true" : "false");
-        current = current->next;
+    bookingInfo *cur;
+    for (int member = 1; member <= 5; member++) {
+        cur = head;
+        printf("Bookings for Member %d:\n", member);
+        while (cur != NULL) {
+            if (cur->member == member) {
+                printf("Date: %d, Time: %04d, Duration: %.1f hours, Priority: %d, Essentials: %s, fAccepted: %d, pAccepted: %d, oAccepted: %d\n",
+                       cur->date, cur->time, cur->duration, cur->priority, cur->essentials,
+                       cur->fAccepted, cur->pAccepted, cur->oAccepted);
+            }
+            cur = cur->next;
+        }
+        printf("\n");
     }
 }
 
@@ -326,13 +351,13 @@ int main() {
                     // DEBUG Print the details of the new booking
                     printf("\nNew Booking:\n");
                     printf("Date: %d\n", newBooking->date);
-                    // printf("Time: %d\n", newBooking->time);
-                    // printf("Duration: %.1f\n", newBooking->duration);
+                    printf("Time: %d\n", newBooking->time);
+                    printf("Duration: %.1f\n", newBooking->duration);
                     printf("Member: %d\n", newBooking->member);
                     printf("Priority: %d\n", newBooking->priority);
                     printf("Essentials: %s\n", newBooking->essentials);
-                    // printf("fAccepted: %d\n", newBooking->fAccepted);
-                    // printf("pAccepted: %d\n", newBooking->pAccepted);
+                    printf("fAccepted: %d\n", newBooking->fAccepted);
+                    printf("pAccepted: %d\n", newBooking->pAccepted);
                     // printf("oAccepted: %d\n", newBooking->oAccepted);
                     
                 } else if (strncmp(buff, "print", 5) == 0) {
