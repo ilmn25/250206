@@ -54,8 +54,47 @@ void insertIntoSortedList(bookingInfo **head, bookingInfo *newBooking) {
     }
 }
 
-// Function to create a new booking based on the command
-bookingInfo* createBooking() {
+// return 3 for 000111, 2 for 010100, etc
+int getEssentialCount(char *essentials)
+{
+    int count = 0;
+    for (int i = 0; i < 6; i++) {
+        if (essentials[i] == '1') {
+            count++;
+        }
+    }
+    return count;
+}
+
+// helper method for setting essentials
+void setEssential(char *essentials, const char *command, bool includePaired) {
+    if (strstr(command, "locker") != NULL) {
+        essentials[0] = '1';
+        if (includePaired) essentials[1] = '1';
+    }
+    if (strstr(command, "umbrella") != NULL) {
+        essentials[1] = '1';
+        if (includePaired) essentials[0] = '1';
+    }
+    if (strstr(command, "battery") != NULL) {
+        essentials[2] = '1';
+        if (includePaired) essentials[3] = '1';
+    }
+    if (strstr(command, "cable") != NULL) {
+        essentials[3] = '1';
+        if (includePaired) essentials[2] = '1';
+    }
+    if (strstr(command, "valetpark") != NULL) {
+        essentials[4] = '1';
+        if (includePaired) essentials[5] = '1';
+    }
+    if (strstr(command, "inflationservice") != NULL) {
+        essentials[5] = '1';
+        if (includePaired) essentials[4] = '1';
+    }
+}
+
+bookingInfo* createBooking() { 
     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
     
     // Convert the member to integer
@@ -95,58 +134,69 @@ bookingInfo* createBooking() {
 
     // Store the duration
     newBooking->duration = atof(COMMAND[4]);
-
-    // Convert the priority to integer
+ 
+    // Convert priority and essentials to integer
+    strcpy(newBooking->essentials, "000000"); 
     if (strcmp(COMMAND[0], "addEvent") == 0) {
         newBooking->priority = 1;
+
+        setEssential(newBooking->essentials, COMMAND[5], false);
+        setEssential(newBooking->essentials, COMMAND[6], false);
+        setEssential(newBooking->essentials, COMMAND[7], false); 
+        if (getEssentialCount(newBooking->essentials) != 3) {
+            printf("Invalid essentials format: need exactly 3 essentials to be booked\n");
+            free(newBooking);
+            return NULL;
+        }
+
     } else if (strcmp(COMMAND[0], "addReservation") == 0) {
         newBooking->priority = 2;
+
+        setEssential(newBooking->essentials, COMMAND[5], true);
+        setEssential(newBooking->essentials, COMMAND[6], true);
+        if (getEssentialCount(newBooking->essentials) != 2) {
+            printf("Invalid essentials format: need exactly 2 essentials which belongs in a pair\n");
+            free(newBooking);
+            return NULL;
+        }
+
     } else if (strcmp(COMMAND[0], "addParking") == 0) {
         newBooking->priority = 3;
+
+        setEssential(newBooking->essentials, COMMAND[5], true);
+        setEssential(newBooking->essentials, COMMAND[6], true);
+        if (getEssentialCount(newBooking->essentials) != 2 && getEssentialCount(newBooking->essentials) != 0) {
+            printf("Invalid essentials format: need either none or 2 essential which belongs in a pair\n");
+            free(newBooking);
+            return NULL;
+        }
+
     } else if (strcmp(COMMAND[0], "bookEssentials") == 0) {
         newBooking->priority = 4;
+
+        setEssential(newBooking->essentials, COMMAND[5], false);
+        if (getEssentialCount(newBooking->essentials) != 1) {
+            printf("Invalid essentials format: need at exactly 1 valid essential only\n");
+            free(newBooking);
+            return NULL;
+        }
+
     } else {
         printf("Invalid command\n");
         free(newBooking);
         return NULL;
-    }
-
-    // Convert the essentials to binary string
-    // (Thinking) Will further adjust to handle offer in pairs and other conditions (Thinking)
-    strcpy(newBooking->essentials, "000000");
-    if (strstr(COMMAND[5], "locker") != NULL) {
-        newBooking->essentials[0] = '1';
-    }
-    if (strstr(COMMAND[5], "umbrella") != NULL) {
-        newBooking->essentials[1] = '1';
-    }
-    if (strstr(COMMAND[5], "battery") != NULL) {
-        newBooking->essentials[2] = '1';
-    }
-    if (strstr(COMMAND[5], "cable") != NULL) {
-        newBooking->essentials[3] = '1';
-    }
-    if (strstr(COMMAND[5], "valetpark") != NULL) {
-        newBooking->essentials[4] = '1';
-    }
-    if (strstr(COMMAND[5], "inflationservice") != NULL) {
-        newBooking->essentials[5] = '1';
-    }
+    } 
 
     newBooking->fAccepted = false; // Further determined by the system
     newBooking->pAccepted = false; // Further determined by the system
     newBooking->oAccepted = false; // Further determined by the system
+
     newBooking->next = NULL;
-
     return newBooking;
-}
+} 
 
-// (Thinking) Variables to handle the count of remaining essentials or parking spaces at corresponding time slot (Thinking)
-
-void getInput() {
-    char input[100];
-    scanf(" %[^\n]", input); //get
-    
+// take string and split it up by " " and put in COMMAND[,] array. Used after getinput and in loadbatch
+void setCommandFromString(char input[]) {
     for (int i = 0; i < 10; i++) {
         COMMAND[i][0] = '\0';
     } //wipe
@@ -169,15 +219,22 @@ void getInput() {
     }
 }
 
-bool checkArgCount(int count) {
-    int i = 0;
-    while (COMMAND[i][0] != '\0') i++;
-    if (i == count) {
-        return true;
+
+void addBookingFromCommand(int fd) {
+    bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
+    if (newBooking != NULL) {
+        char buff[100]; // Declare a large enough buffer to write the booking information
+        sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
+                newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
+                newBooking->priority, newBooking->essentials, newBooking->fAccepted,
+                newBooking->pAccepted, newBooking->oAccepted);
+        write(fd, buff, sizeof(buff)); // Send booking info to parent
+        free(newBooking); // Free the booking
+    } else {
+        write(fd, "fail", 4); // Tell parent that booking failed
     }
-    printf("input error: wrong argument count for %s, expected %d, received %d\n", COMMAND[0], count-1, i-1);
-    return false;
-}
+} 
+ 
 
 void importBatch(const char *filename, int fd) {
     FILE *file = fopen(filename + 1, "r"); // Ignore the first character '-'
@@ -191,79 +248,9 @@ void importBatch(const char *filename, int fd) {
         line[strcspn(line, "\n")] = '\0'; // Convert the newline character to null character
 
         // Seperate the line into tokens and store them in COMMAND array
-        int i = 0;
-        char *token = strtok(line, " ");
-        while (token != NULL && i < 10) {
-            if (i == 5) {
-                // Combine all remaining tokens into COMMAND[5] (essentials)
-                strcpy(COMMAND[i], token);
-                while ((token = strtok(NULL, " ")) != NULL) {
-                    strcat(COMMAND[i], " ");
-                    strcat(COMMAND[i], token);
-                }
-                break;
-            } else {
-                strcpy(COMMAND[i++], token);
-                token = strtok(NULL, " ");
-            }
-        }
-
-        // Process the command
-        if (strcmp(COMMAND[0], "addParking") == 0) { 
-            bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-            if (newBooking != NULL) {
-                char buff[100]; // Declare a large enough buffer to write the booking information
-                sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                        newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                        newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                        newBooking->pAccepted, newBooking->oAccepted);
-                write(fd, buff, sizeof(buff)); // Send booking info to parent
-                free(newBooking); // Free the booking
-            } else {
-                write(fd, "fail", 4); // Tell parent that booking failed
-            }
-        } else if (strcmp(COMMAND[0], "addReservation") == 0) { 
-            bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-            if (newBooking != NULL) {
-                char buff[100]; // Declare a large enough buffer to write the booking information
-                sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                        newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                        newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                        newBooking->pAccepted, newBooking->oAccepted);
-                write(fd, buff, sizeof(buff)); // Send booking info to parent
-                free(newBooking); // Free the booking
-            } else {
-                write(fd, "fail", 4); // Tell parent that booking failed
-            }
-        } else if (strcmp(COMMAND[0], "bookEssentials") == 0) { 
-            bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-            if (newBooking != NULL) {
-                char buff[100]; // Declare a large enough buffer to write the booking information
-                sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                        newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                        newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                        newBooking->pAccepted, newBooking->oAccepted);
-                write(fd, buff, sizeof(buff)); // Send booking info to parent
-                free(newBooking); // Free the booking
-            } else {
-                write(fd, "fail", 4); // Tell parent that booking failed
-            }
-        } else if (strcmp(COMMAND[0], "addEvent") == 0) { 
-            bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-            if (newBooking != NULL) {
-                char buff[100]; // Declare a large enough buffer to write the booking information
-                sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                        newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                        newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                        newBooking->pAccepted, newBooking->oAccepted);
-                write(fd, buff, sizeof(buff)); // Send booking info to parent
-                free(newBooking); // Free the booking
-            } else {
-                write(fd, "fail", 4); // Tell parent that booking failed
-            }
-        } else {
-            printf("Invalid command in batch file: %s\n", COMMAND[0]);
-        }
+        setCommandFromString(line);
+        // Process command
+        addBookingFromCommand(fd);
     }
 
     fclose(file);
@@ -286,7 +273,10 @@ int main() {
         
         printf("Please enter booking: "); 
         
-        getInput();
+        // get input (typed in by user)
+        char line[100];
+        scanf(" %[^\n]", line);
+        setCommandFromString(line);
         
         int fd[2], pid;
 
@@ -304,65 +294,14 @@ int main() {
             // Write
             if (strcmp(COMMAND[0], "endProgram") == 0) {
                 write(fd[1], "end", 3); // Tell parent to end the program
-            } else if (strcmp(COMMAND[0], "addParking") == 0) { 
-                bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-                if (newBooking != NULL) {
-                    char buff[100]; // Declare a large enough buffer to write the booking information
-                    sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                            newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                            newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                            newBooking->pAccepted, newBooking->oAccepted);
-                    write(fd[1], buff, sizeof(buff)); // Send booking info to parent
-                    free(newBooking); // Free the booking
-                } else {
-                    write(fd[1], "fail", 4); // Tell parent that booking failed
-                }
-            } else if (strcmp(COMMAND[0], "addReservation") == 0) { 
-                bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-                if (newBooking != NULL) {
-                    char buff[100]; // Declare a large enough buffer to write the booking information
-                    sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                            newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                            newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                            newBooking->pAccepted, newBooking->oAccepted);
-                    write(fd[1], buff, sizeof(buff)); // Send booking info to parent
-                    free(newBooking); // Free the booking
-                } else {
-                    write(fd[1], "fail", 4); // Tell parent that booking failed
-                }
-            } else if (strcmp(COMMAND[0], "bookEssentials") == 0) { 
-                bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-                if (newBooking != NULL) {
-                    char buff[100]; // Declare a large enough buffer to write the booking information
-                    sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                            newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                            newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                            newBooking->pAccepted, newBooking->oAccepted);
-                    write(fd[1], buff, sizeof(buff)); // Send booking info to parent
-                    free(newBooking); // Free the booking
-                } else {
-                    write(fd[1], "fail", 4); // Tell parent that booking failed
-                }
-            } else if (strcmp(COMMAND[0], "addEvent") == 0) { 
-                bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
-                if (newBooking != NULL) {
-                    char buff[100]; // Declare a large enough buffer to write the booking information
-                    sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                            newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
-                            newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                            newBooking->pAccepted, newBooking->oAccepted);
-                    write(fd[1], buff, sizeof(buff)); // Send booking info to parent
-                    free(newBooking); // Free the booking
-                } else {
-                    write(fd[1], "fail", 4); // Tell parent that booking failed
-                }
-            } else if (strcmp(COMMAND[0], "importBatch") == 0) { 
+            }  else if (strcmp(COMMAND[0], "importBatch") == 0) { 
                 importBatch(COMMAND[1], fd[1]);
                 // (Command) importBatch -test_data_G30.dat (Command)
             } else if (strcmp(COMMAND[0], "printBookings") == 0) { 
                 write(fd[1], "print", 5); // Tell parent to print bookings
             } else {
-                printf("invalid, entered: %s\n", COMMAND[0]);
+                // Directly process command in add bookings, if command is random like "awdawd" will report invalid inside
+                addBookingFromCommand(fd[1]);
             }
             close(fd[1]); // Close child out
             exit(0);
@@ -382,10 +321,24 @@ int main() {
                         (int *)&newBooking->pAccepted, (int *)&newBooking->oAccepted); // buff + 5 to skip "done "
                     newBooking->next = NULL;
                     insertIntoSortedList(&head, newBooking);
+
+
+                    // DEBUG Print the details of the new booking
+                    printf("\nNew Booking:\n");
+                    printf("Date: %d\n", newBooking->date);
+                    // printf("Time: %d\n", newBooking->time);
+                    // printf("Duration: %.1f\n", newBooking->duration);
+                    printf("Member: %d\n", newBooking->member);
+                    printf("Priority: %d\n", newBooking->priority);
+                    printf("Essentials: %s\n", newBooking->essentials);
+                    // printf("fAccepted: %d\n", newBooking->fAccepted);
+                    // printf("pAccepted: %d\n", newBooking->pAccepted);
+                    // printf("oAccepted: %d\n", newBooking->oAccepted);
+                    
                 } else if (strncmp(buff, "print", 5) == 0) {
                     printBookings();
                 } else if (strncmp(buff, "fail", 4) == 0) {
-                    printf("Operation failed\n");
+                    // printf("Operation failed\n");
                 }
             }
             if (strncmp(buff, "end", 3) == 0) {
@@ -398,4 +351,15 @@ int main() {
     
     printf("Bye!\n");
     return 0;
+}
+
+// arg count validation in command array
+bool checkArgCount(int count) {
+    int i = 0;
+    while (COMMAND[i][0] != '\0') i++;
+    if (i == count) {
+        return true;
+    }
+    printf("input error: wrong argument count for %s, expected %d, received %d\n", COMMAND[0], count-1, i-1);
+    return false;
 }
