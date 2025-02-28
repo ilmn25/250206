@@ -276,20 +276,43 @@ void importBatch(const char *filename, int fd) {
 
 // (Tentative) Code for viewing the booking information (Tentative)
 void printBookings() {
-    bookingInfo *cur;
-    for (int member = 1; member <= 5; member++) {
-        cur = head;
-        printf("Bookings for Member %d:\n", member);
-        while (cur != NULL) {
-            if (cur->member == member) {
-                printf("Date: %d, Time: %04d, Duration: %.1f hours, Priority: %d, Essentials: %s, fAccepted: %d, pAccepted: %d, oAccepted: %d\n",
-                       cur->date, cur->time, cur->duration, cur->priority, cur->essentials,
-                       cur->fAccepted, cur->pAccepted, cur->oAccepted);
-            }
-            cur = cur->next;
-        }
-        printf("\n");
+    printf("*** Parking Booking – ACCEPTED / FCFS ***\n\n");
+    for (int member = 1; member <= 5; member++) { 
+        printBooking(member, true);
     }
+    printf("- End -\n");
+    printf("===========================================================================\n");
+    printf("*** Parking Booking – REJECTED / FCFS ***\n\n");
+    for (int member = 1; member <= 5; member++) { 
+        printBooking(member, false);
+    }
+    printf("- End -\n");
+}
+
+void printBooking(int member, bool isAccepted) {
+    bookingInfo *cur = head;
+    printf("Member_%c has the following bookings:\n", 'A' + member - 1);
+    printf("Date       Start End   Type         Device\n");
+    printf("===========================================================================\n");
+    while (cur != NULL) {
+        if (cur->member == member && cur->fAccepted == true) {
+            int startHour = cur->time / 100;
+            int startMin = cur->time % 100;
+            int endHour = startHour + (int)cur->duration;
+            int endMin = startMin + (int)((cur->duration - (int)cur->duration) * 60);
+            if (endMin >= 60) {
+                endHour += 1;
+                endMin -= 60;
+            }
+            printf("%04d-%02d-%02d %02d:%02d %02d:%02d %-12s %s\n",
+                    cur->date / 10000, (cur->date / 100) % 100, cur->date % 100,
+                    startHour, startMin, endHour, endMin,
+                    cur->priority == 1 ? "Parking" : cur->priority == 2 ? "Reservation" : "Event",
+                    cur->essentials);
+        }
+        cur = cur->next;
+    }
+    printf("\n");
 }
 
 int main() {
@@ -303,6 +326,8 @@ int main() {
         scanf(" %[^\n]", line);
         setCommandFromString(line);
         
+        printf("\n");
+         
         int fd[2], pid;
 
         if (pipe(fd) < 0) {
