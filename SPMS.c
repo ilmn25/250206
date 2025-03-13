@@ -7,6 +7,8 @@
 
 char COMMAND[10][100];
 
+int i;
+
 // Using linked list to store the booking information
 typedef struct bookingInfo {
     int date; // YYYYMMDD
@@ -76,7 +78,7 @@ void insertIntoSortedList(bookingInfo **head, bookingInfo *newBooking) {
 int getEssentialCount(char *essentials)
 {
     int count = 0;
-    for (int i = 0; i < 6; i++) {
+    for (i = 0; i < 6; i++) {
         if (essentials[i] == '1') {
             count++;
         }
@@ -215,11 +217,11 @@ bookingInfo* createBooking() {
 
 // take string and split it up by " " and put in COMMAND[,] array. Used after getinput and in loadbatch
 void setCommandFromString(char input[]) {
-    for (int i = 0; i < 10; i++) {
+    for (i = 0; i < 10; i++) {
         COMMAND[i][0] = '\0';
     } //wipe
     
-    int i = 0; //seperate by space
+    i = 0; //seperate by space
     char *token = strtok(input, " ");
     while (token != NULL && i < 10) {
         if (i == 5) {
@@ -274,21 +276,6 @@ void importBatch(const char *filename, int fd) {
     fclose(file);
 }
 
-// (Tentative) Code for viewing the booking information (Tentative)
-void printBookings() {
-    printf("*** Parking Booking – ACCEPTED / FCFS ***\n\n");
-    for (int member = 1; member <= 5; member++) { 
-        printBooking(member, true);
-    }
-    printf("- End -\n");
-    printf("===========================================================================\n");
-    printf("*** Parking Booking – REJECTED / FCFS ***\n\n");
-    for (int member = 1; member <= 5; member++) { 
-        printBooking(member, false);
-    }
-    printf("- End -\n");
-}
-
 void printBooking(int member, bool isAccepted) {
     bookingInfo *cur = head;
     printf("Member_%c has the following bookings:\n", 'A' + member - 1);
@@ -313,6 +300,22 @@ void printBooking(int member, bool isAccepted) {
         cur = cur->next;
     }
     printf("\n");
+}
+
+// (Tentative) Code for viewing the booking information (Tentative)
+void printBookings() {
+    int member;
+    printf("*** Parking Booking - ACCEPTED / FCFS ***\n\n");
+    for (member = 1; member <= 5; member++) { 
+        printBooking(member, true);
+    }
+    printf("- End -\n");
+    printf("===========================================================================\n");
+    printf("*** Parking Booking - REJECTED / FCFS ***\n\n");
+    for (member = 1; member <= 5; member++) { 
+        printBooking(member, false);
+    }
+    printf("- End -\n");
 }
 
 int main() {
@@ -405,7 +408,7 @@ int main() {
 
 // arg count validation in command array
 bool checkArgCount(int count) {
-    int i = 0;
+    i = 0;
     while (COMMAND[i][0] != '\0') i++;
     if (i == count) {
         return true;
