@@ -16,9 +16,9 @@ typedef struct bookingInfo {
     int member; // Member A to E (1 - 5)
     int priority; // Priority (1: Event, 2: Reservation, 3: Parking, 4: Essentials)
     char essentials[6]; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
-    bool fAccepted; // Accepted or not (First Come First Served)
-    bool pAccepted; // Accepted or not (Priority)
-    bool oAccepted; // Accepted or not (Optimized)
+    int fAccepted; // Accepted or not (First Come First Served)
+    int pAccepted; // Accepted or not (Priority)
+    int oAccepted; // Accepted or not (Optimized)
     struct bookingInfo *next;
 } bookingInfo;
 
@@ -96,19 +96,23 @@ void setEssential(char *essentials, const char *command, bool includePaired) {
 }
 
 // NOT WORKING FOR BATCH YET, BECAUSE THIS CHECK IS CALLED BEFORE PREVIOUS BOOKING GETS LINKED
-bool isFCFS(int time, int duration) {
+int isFCFS(int time, int duration) {
     bookingInfo *cur = head;
+        printf("b date format\n");
     while (cur != NULL) {
         int curEndTime = cur->time + cur->duration * 100;
         int targetEndTime = time + duration * 100;
         if ((time >= cur->time && time < curEndTime) || 
             (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
             (time <= cur->time && targetEndTime >= curEndTime)) {
-            return false;
+        printf("b date format\n");
+            return 0; 
         }
         cur = cur->next;
     }
-    return true;
+        printf("a date format\n");
+    return 1; 
+    
 }
 
 bookingInfo* createBooking() { 
@@ -200,9 +204,8 @@ bookingInfo* createBooking() {
         return NULL;
     } 
     newBooking->fAccepted = isFCFS(newBooking->time, newBooking->duration); 
-    newBooking->pAccepted = false; 
-    newBooking->oAccepted = false;  
-       
+    newBooking->pAccepted = 0; 
+    newBooking->oAccepted = 0;   
     newBooking->next = NULL;
     return newBooking;
 }
@@ -240,7 +243,7 @@ void addBookingFromCommand(int fd) {
         sprintf(buff, "done %d %d %d %d %s %d %d %d",
                 newBooking->time, newBooking->duration, newBooking->member,
                 newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                newBooking->pAccepted, newBooking->oAccepted);
+                newBooking->pAccepted, newBooking->oAccepted); 
         write(fd, buff, sizeof(buff)); // Send booking info to parent
         free(newBooking); // Free the booking
     } else {
@@ -268,7 +271,7 @@ void importBatch(const char *filename, int fd) {
 
     fclose(file);
 }
-void printBooking(int member, bool isAccepted) {
+void printBooking(int member, int isAccepted) {
     bookingInfo *cur = head;
     printf("Member_%c has the following bookings:\n", 'A' + member - 1);
     printf("Date       Start End   Type         Device\n");
@@ -297,13 +300,13 @@ void printBookings() {
     int member;
     printf("*** Parking Booking - ACCEPTED / FCFS ***\n\n");
     for (member = 1; member <= 5; member++) { 
-        printBooking(member, true);
+        printBooking(member, 1);
     }
     printf("- End -\n");
     printf("===========================================================================\n");
     printf("*** Parking Booking - REJECTED / FCFS ***\n\n");
     for (member = 1; member <= 5; member++) { 
-        printBooking(member, false);
+        printBooking(member, 0);
     }
     printf("- End -\n");
 }
@@ -359,8 +362,8 @@ int main() {
                     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
                     sscanf(buff + 5, "%d %d %d %d %6s %d %d %d",
                         &newBooking->time, &newBooking->duration, &newBooking->member,
-                        &newBooking->priority, newBooking->essentials, (int *)&newBooking->fAccepted,
-                        (int *)&newBooking->pAccepted, (int *)&newBooking->oAccepted); // buff + 5 to skip "done "
+                        &newBooking->priority, newBooking->essentials, 
+                        &newBooking->fAccepted, &newBooking->pAccepted, &newBooking->oAccepted);
                     newBooking->next = NULL;
                     insertIntoSortedList(&head, newBooking);
 
