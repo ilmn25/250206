@@ -11,12 +11,11 @@ int i;
 
 // Using linked list to store the booking information
 typedef struct bookingInfo {
-    int date; // YYYYMMDD
-    int time; // HHMM
-    float duration; // Duration (t.t hours)
+    int time; // YYYYMMDDHH
+    int duration; // hour
     int member; // Member A to E (1 - 5)
     int priority; // Priority (1: Event, 2: Reservation, 3: Parking, 4: Essentials)
-    char essentials[7]; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
+    char essentials[6]; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
     bool fAccepted; // Accepted or not (First Come First Served)
     bool pAccepted; // Accepted or not (Priority)
     bool oAccepted; // Accepted or not (Optimized)
@@ -25,31 +24,13 @@ typedef struct bookingInfo {
 
 bookingInfo *head = NULL;
 
-// NOT WORKING FOR BATCH YET, BECAUSE THIS CHECK IS CALLED BEFORE PREVIOUS BOOKING GETS LINKED
-bool isOverlapTime(int date, int time, float duration) {
-    bookingInfo *cur = head;
-    while (cur != NULL) {
-        if (cur->date == date) {
-            int curEndTime = cur->time + (int)(cur->duration * 100);
-            int targetEndTime = time + (int)(duration * 100);
-            if ((time >= cur->time && time < curEndTime) || 
-                (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
-                (time <= cur->time && targetEndTime >= curEndTime)) {
-                return true;
-            }
-        }
-        cur = cur->next;
-    }
-    return false;
-} 
-
 // Function to insert a booking into the sorted linked list
 void insertIntoSortedList(bookingInfo **head, bookingInfo *newBooking) {
     bookingInfo *cur = *head;
     bookingInfo *pre = NULL;
 
     while (cur != NULL) {
-        if (cur->date > newBooking->date || (cur->date == newBooking->date && cur->time > newBooking->time)) {
+        if (cur->time > newBooking->time) {
             if (pre == NULL) {
                 newBooking->next = *head;
                 *head = newBooking;
@@ -114,6 +95,22 @@ void setEssential(char *essentials, const char *command, bool includePaired) {
     }
 }
 
+// NOT WORKING FOR BATCH YET, BECAUSE THIS CHECK IS CALLED BEFORE PREVIOUS BOOKING GETS LINKED
+bool isFCFS(int time, int duration) {
+    bookingInfo *cur = head;
+    while (cur != NULL) {
+        int curEndTime = cur->time + cur->duration * 100;
+        int targetEndTime = time + duration * 100;
+        if ((time >= cur->time && time < curEndTime) || 
+            (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
+            (time <= cur->time && targetEndTime >= curEndTime)) {
+            return false;
+        }
+        cur = cur->next;
+    }
+    return true;
+}
+
 bookingInfo* createBooking() { 
     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
     
@@ -134,26 +131,22 @@ bookingInfo* createBooking() {
         return NULL;
     }
 
-    // Convert the date to integer
-    int year, month, day;
+    // Convert the date and time to integer
+    int year, month, day, hour;
     if (sscanf(COMMAND[2], "%d-%d-%d", &year, &month, &day) != 3) {
         printf("Invalid date format\n");
         free(newBooking);
         return NULL;
     }
-    newBooking->date = year * 10000 + month * 100 + day;
-
-    // Convert the time to integer
-    int hour, minute;
-    if (sscanf(COMMAND[3], "%d:%d", &hour, &minute) != 2) {
+    if (sscanf(COMMAND[3], "%d:00", &hour) != 1) { // Assuming time is given in HH:00 format
         printf("Invalid time format\n");
         free(newBooking);
         return NULL;
     }
-    newBooking->time = hour * 100 + minute;
+    newBooking->time = year * 1000000 + month * 10000 + day * 100 + hour;
 
     // Store the duration
-    newBooking->duration = atof(COMMAND[4]);
+    newBooking->duration = atoi(COMMAND[4]);
  
     // Convert priority and essentials to integer
     strcpy(newBooking->essentials, "000000"); 
@@ -206,14 +199,14 @@ bookingInfo* createBooking() {
         free(newBooking);
         return NULL;
     } 
-
-    newBooking->fAccepted = !isOverlapTime(newBooking->date, newBooking->time, newBooking->duration); // Further determined by the system
-    newBooking->pAccepted = false; // Further determined by the system
-    newBooking->oAccepted = false; // Further determined by the system
-
+    newBooking->fAccepted = isFCFS(newBooking->time, newBooking->duration); 
+    newBooking->pAccepted = false; 
+    newBooking->oAccepted = false;  
+       
     newBooking->next = NULL;
     return newBooking;
-} 
+}
+ 
 
 // take string and split it up by " " and put in COMMAND[,] array. Used after getinput and in loadbatch
 void setCommandFromString(char input[]) {
@@ -244,8 +237,8 @@ void addBookingFromCommand(int fd) {
     bookingInfo *newBooking = createBooking(); // (Thinking) May need further distinguished (Thinking)
     if (newBooking != NULL) {
         char buff[100]; // Declare a large enough buffer to write the booking information
-        sprintf(buff, "done %d %d %.1f %d %d %s %d %d %d",
-                newBooking->date, newBooking->time, newBooking->duration, newBooking->member,
+        sprintf(buff, "done %d %d %d %d %s %d %d %d",
+                newBooking->time, newBooking->duration, newBooking->member,
                 newBooking->priority, newBooking->essentials, newBooking->fAccepted,
                 newBooking->pAccepted, newBooking->oAccepted);
         write(fd, buff, sizeof(buff)); // Send booking info to parent
@@ -253,7 +246,7 @@ void addBookingFromCommand(int fd) {
     } else {
         write(fd, "fail", 4); // Tell parent that booking failed
     }
-} 
+}
  
 
 void importBatch(const char *filename, int fd) {
@@ -275,26 +268,23 @@ void importBatch(const char *filename, int fd) {
 
     fclose(file);
 }
-
 void printBooking(int member, bool isAccepted) {
     bookingInfo *cur = head;
     printf("Member_%c has the following bookings:\n", 'A' + member - 1);
     printf("Date       Start End   Type         Device\n");
     printf("===========================================================================\n");
     while (cur != NULL) {
-        if (cur->member == member && cur->fAccepted == true) {
-            int startHour = cur->time / 100;
-            int startMin = cur->time % 100;
-            int endHour = startHour + (int)cur->duration;
-            int endMin = startMin + (int)((cur->duration - (int)cur->duration) * 60);
-            if (endMin >= 60) {
-                endHour += 1;
-                endMin -= 60;
-            }
-            printf("%04d-%02d-%02d %02d:%02d %02d:%02d %-12s %s\n",
-                    cur->date / 10000, (cur->date / 100) % 100, cur->date % 100,
-                    startHour, startMin, endHour, endMin,
-                    cur->priority == 1 ? "Parking" : cur->priority == 2 ? "Reservation" : "Event",
+        if (cur->member == member && cur->fAccepted == isAccepted) {
+            int year = cur->time / 1000000;
+            int month = (cur->time / 10000) % 100;
+            int day = (cur->time / 100) % 100;
+            int startHour = cur->time % 100;
+            int endHour = startHour + cur->duration;
+
+            printf("%04d-%02d-%02d %02d:00 %02d:00 %-12s %s\n",
+                    year, month, day,
+                    startHour, endHour,
+                    cur->priority == 1 ? "Event" : cur->priority == 2 ? "Reservation" : cur->priority == 3 ? "Parking" : "Essentials",
                     cur->essentials);
         }
         cur = cur->next;
@@ -317,7 +307,6 @@ void printBookings() {
     }
     printf("- End -\n");
 }
-
 int main() {
     printf("~~ WELCOME TO PolyU ~~\n");
     while (true) { 
@@ -368,30 +357,28 @@ int main() {
                     break;
                 } else if (strncmp(buff, "done", 4) == 0) {
                     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
-                    sscanf(buff + 5, "%d %d %f %d %d %6s %d %d %d",
-                        &newBooking->date, &newBooking->time, &newBooking->duration, &newBooking->member,
+                    sscanf(buff + 5, "%d %d %d %d %6s %d %d %d",
+                        &newBooking->time, &newBooking->duration, &newBooking->member,
                         &newBooking->priority, newBooking->essentials, (int *)&newBooking->fAccepted,
                         (int *)&newBooking->pAccepted, (int *)&newBooking->oAccepted); // buff + 5 to skip "done "
                     newBooking->next = NULL;
                     insertIntoSortedList(&head, newBooking);
 
-
                     // DEBUG Print the details of the new booking
                     printf("\nNew Booking:\n");
-                    printf("Date: %d\n", newBooking->date);
                     printf("Time: %d\n", newBooking->time);
-                    printf("Duration: %.1f\n", newBooking->duration);
+                    printf("Duration: %d\n", newBooking->duration);
                     printf("Member: %d\n", newBooking->member);
                     printf("Priority: %d\n", newBooking->priority);
                     printf("Essentials: %s\n", newBooking->essentials);
                     printf("fAccepted: %d\n", newBooking->fAccepted);
                     printf("pAccepted: %d\n", newBooking->pAccepted);
-                    // printf("oAccepted: %d\n", newBooking->oAccepted);
+                    printf("oAccepted: %d\n", newBooking->oAccepted);
                     
                 } else if (strncmp(buff, "print", 5) == 0) {
                     printBookings();
                 } else if (strncmp(buff, "fail", 4) == 0) {
-                    // printf("Operation failed\n");
+                    printf("Operation failed\n");
                 }
             }
             if (strncmp(buff, "end", 3) == 0) {
