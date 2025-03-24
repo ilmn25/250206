@@ -1,3 +1,8 @@
+// SPMS Group 30
+// 23118174d WONG Ka Hei 
+// 23118556d KWAN Kai Man 
+// 23100195d CAO Wei 
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -396,12 +401,13 @@ void CreateBookingFromCommand(int fd)
 
         insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation
         
-        free(newBooking); // Free the booking
+        // free(newBooking); // Free the booking
     } else {
         write(fd, "fail", 4); // Tell parent that booking failed
     }
 }
 
+// importBatch -test_data_G30.dat 
 void importBatch(const char *filename, int fd) 
 {
     FILE *file = fopen(filename + 1, "r"); // Ignore the first character '-'
@@ -418,6 +424,7 @@ void importBatch(const char *filename, int fd)
         setCommandFromString(line);
         // Process command
         CreateBookingFromCommand(fd);
+        // printf("= %s %s %s %s\n", COMMAND[0], COMMAND[1], COMMAND[2], COMMAND[3]);
     }
 
     fclose(file);
@@ -509,8 +516,7 @@ int main() {
             if (strcmp(COMMAND[0], "endProgram") == 0) {
                 write(fd[1], "end", 3); // Tell parent to end the program
             }  else if (strcmp(COMMAND[0], "importBatch") == 0) { 
-                importBatch(COMMAND[1], fd[1]);
-                // (Command) importBatch -test_data_G30.dat (Command)
+                importBatch(COMMAND[1], fd[1]); 
             } else if (strcmp(COMMAND[0], "printBookings") == 0) { 
                 write(fd[1], "print", 5); // Tell parent to print bookings
             } else if (
@@ -542,7 +548,8 @@ int main() {
                     newBooking->next = NULL;
                     insertIntoBookings(&head, newBooking);
 
-                    // DEBUG Print the details of the new booking
+                    // DEBUG
+                    printf("--------------------------\n");
                     printf("New Booking:\n");
                     printf("Time: %d\n", newBooking->time);
                     printf("Duration: %d\n", newBooking->duration);
@@ -550,7 +557,7 @@ int main() {
                     printf("Priority: %d\n", newBooking->priority);
                     printf("Essentials: %s\n", newBooking->essentials);
                     printf("fAccepted: %d\n", newBooking->fAccepted);
-                    printf("pAccepted: %d\n", newBooking->pAccepted);
+                    printf("pAccepted: %d\n", newBooking->pAccepted); 
                     // printf("oAccepted: %d\n", newBooking->oAccepted); 
                     
                 } else if (strncmp(buff, "print", 5) == 0) {
