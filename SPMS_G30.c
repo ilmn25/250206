@@ -385,7 +385,7 @@ void setCommandFromString(char input[])
 
 void CreateBookingFromCommand(int fd) 
 {
-    bookingInfo *newBooking = handleCreateBooking(); // (Thinking) May need further distinguished (Thinking)
+    bookingInfo *newBooking = handleCreateBooking();
     if (newBooking != NULL) {
         char buff[100]; // Declare a large enough buffer to write the booking information
         sprintf(buff, "done %d %d %d %d %s %d %d %d",
@@ -393,6 +393,9 @@ void CreateBookingFromCommand(int fd)
                 newBooking->priority, newBooking->essentials, newBooking->fAccepted,
                 newBooking->pAccepted, newBooking->oAccepted); 
         write(fd, buff, sizeof(buff)); // Send booking info to parent
+
+        insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation
+        
         free(newBooking); // Free the booking
     } else {
         write(fd, "fail", 4); // Tell parent that booking failed
