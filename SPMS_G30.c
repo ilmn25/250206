@@ -41,7 +41,9 @@ bool isCorrectArgCount(int count);
 bookingInfo* handleCreateBooking();
 void setCommandFromString(char input[]);
 void CreateBookingFromCommand(int fd);
-void printBookings();
+void printFCFS();
+void printPR();
+void printOPT();
 void handlePrintBooking(int member, int isAccepted, int acceptedType);
 void importBatch(const char *filename, int fd); 
 
@@ -198,7 +200,7 @@ int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool
 bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB) {
     // return bookingA->priority >= bookingB->priority;
 
-    
+
     // NOT TESTED
     // Define the priority window
     int priorityStart = 800; // 08:00 AM
@@ -494,12 +496,24 @@ void importBatch(const char *filename, int fd)
 void handlePrintBooking(int member, int isAccepted, int acceptedType) 
 {
     bookingInfo *cur = head;
+    int accepted;
     printf("===============================================\n");
     printf("Member_%c has the following bookings:\n", 'A' + member - 1);
     printf("Date       Start End   Type         Needs\n");
     printf("-------------------------------------------\n");
-    while (cur != NULL) {
-        int accepted = (acceptedType == 1) ? cur->fAccepted : cur->pAccepted;
+    while (cur != NULL) { 
+        switch (acceptedType) {
+            case 1:
+                accepted = cur->fAccepted;
+                break;
+            case 2:
+                accepted = cur->pAccepted;
+                break;
+            case 3:
+                accepted = cur->oAccepted;
+                break;
+        }
+
         if (cur->member == member && accepted == isAccepted) {
             int year = cur->time / 1000000;
             int month = (cur->time / 10000) % 100;
@@ -518,9 +532,11 @@ void handlePrintBooking(int member, int isAccepted, int acceptedType)
     printf("\n");
 }
 
-void printBookings() 
+void printFCFS() 
 {
     int member;
+    printf("===========================================================================\n");
+    printf("===========================================================================\n");
     printf("*** Parking Booking - ACCEPTED / FCFS ***\n\n");
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 1, 1); // member, isAccept, 1 = fcfs 2 = pr
@@ -531,8 +547,13 @@ void printBookings()
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 0, 1);  
     }
-    printf("- End -\n");
+    printf("- End -\n"); 
+}
 
+void printPR() 
+{
+    int member; 
+    printf("===========================================================================\n");
     printf("===========================================================================\n");
     printf("*** Parking Booking - ACCEPTED / PRIORITY ***\n\n");
     for (member = 1; member <= 5; member++) { 
@@ -545,6 +566,30 @@ void printBookings()
         handlePrintBooking(member, 0, 2);  
     }
     printf("- End -\n");
+}
+
+void printOPT()  
+{
+    int member; 
+    printf("===========================================================================\n");
+    printf("===========================================================================\n");
+    printf("*** Parking Booking - ACCEPTED / OPTIMIZED ***\n\n");
+    for (member = 1; member <= 5; member++) { 
+        handlePrintBooking(member, 1, 3); 
+    }
+    printf("- End -\n");
+    printf("===========================================================================\n");
+    printf("*** Parking Booking - REJECTED / OPTIMIZED ***\n\n");
+    for (member = 1; member <= 5; member++) { 
+        handlePrintBooking(member, 0, 3);  
+    }
+    printf("- End -\n");
+}
+void printReport() // NOT DONE
+{
+    printf("===========================================================================\n");
+    printf("===========================================================================\n");
+    printf("PLACEHOLDER REPORT HERE\n");
 }
 
 int main() {
@@ -578,8 +623,19 @@ int main() {
                 write(fd[1], "end", 3); // Tell parent to end the program
             }  else if (strcmp(COMMAND[0], "importBatch") == 0) { 
                 importBatch(COMMAND[1], fd[1]); 
-            } else if (strcmp(COMMAND[0], "printBookings") == 0) { 
-                write(fd[1], "print", 5); // Tell parent to print bookings
+            } else if (strcmp(COMMAND[0], "printBookings") == 0) { // Tell parent to print bookings
+                if (strcmp(COMMAND[1], "FCFS") == 0) {
+                    write(fd[1], "FC", 3);  
+                }
+                else if (strcmp(COMMAND[1], "PR") == 0) {
+                    write(fd[1], "PR", 3);  
+                }
+                else if (strcmp(COMMAND[1], "OPT") == 0) {
+                    write(fd[1], "OP", 3);  
+                } 
+                else if (strcmp(COMMAND[1], "ALL") == 0) {
+                    write(fd[1], "AL", 3);  
+                } 
             } else if (
             strcmp(COMMAND[0], "addEvent") == 0 ||
             strcmp(COMMAND[0], "addReservation") == 0 ||
@@ -621,8 +677,17 @@ int main() {
                     printf("pAccepted: %d\n", newBooking->pAccepted); 
                     // printf("oAccepted: %d\n", newBooking->oAccepted); 
                     
-                } else if (strncmp(buff, "print", 5) == 0) {
-                    printBookings();
+                } else if (strncmp(buff, "FC", 3) == 0) {
+                    printFCFS();
+                } else if (strncmp(buff, "PR", 3) == 0) {
+                    printPR();
+                } else if (strncmp(buff, "OP", 3) == 0) {
+                    printOPT();
+                } else if (strncmp(buff, "AL", 3) == 0) {
+                    printFCFS();
+                    printPR();
+                    printOPT();
+                    printReport();
                 } else if (strncmp(buff, "fail", 4) == 0) {
                     printf("Operation failed\n");
                 }
