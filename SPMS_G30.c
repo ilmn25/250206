@@ -33,9 +33,10 @@ void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking);
 int getEssentialSum(char *essentials);
 void handleSetEssentials(char *essentials, const char *command, bool includePaired);
 int addDurationToTime(int time, int duration);
-int isAvaliableEssential(int time, int duration, int target, int limit, int priority);
-int isAvalibleFCFS(int time, int duration, char essentials[7]);
-int isAvaliblePR(int time, int duration, char essentials[7], int priority);
+bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB);
+int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR);
+int isAvalibleFCFS(bookingInfo* targetBooking);
+int isAvaliblePR(bookingInfo* targetBooking);
 bool isCorrectArgCount(int count);
 bookingInfo* handleCreateBooking();
 void setCommandFromString(char input[]);
@@ -155,7 +156,7 @@ int addDurationToTime(int time, int duration)
 }
 
 // helper method to check if enough number of batteries etc for one more booking to be in the target time and duration 
-int isAvaliableEssential(int time, int duration, int target, int limit, int priority) 
+int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR) 
 { 
     bookingInfo *cur = head;
     bookingInfo *temp[100];
@@ -164,11 +165,11 @@ int isAvaliableEssential(int time, int duration, int target, int limit, int prio
     // scan entire booking list and save (into temp) bookings that are overlapping AND has targeted essential AND more priority
     while (cur != NULL) {
         int curEndTime = addDurationToTime(cur->time, cur->duration);
-        int targetEndTime = addDurationToTime(time, duration);
-        if (cur->essentials[target] == '1' && cur->priority <= priority &&
-            ((time >= cur->time && time < curEndTime) || 
+        int targetEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
+        if (cur->essentials[target] == '1' && (!checkPR || isMorePriorityThan(targetBooking, cur)) &&
+            ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
             (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
-            (time <= cur->time && targetEndTime >= curEndTime))) {
+            (targetBooking->time <= cur->time && targetEndTime >= curEndTime))) {
             // Add cur to temp list
             temp[tempCount++] = cur; 
         }
@@ -178,8 +179,8 @@ int isAvaliableEssential(int time, int duration, int target, int limit, int prio
     // i - iterate through each hour in target time period
     // j - iterate through each overlapping temp to see if more than [limit] overlaps (3 for essentials or 10 for parking)
     int i, j;
-    for (i = 0; i < duration; i++) {
-        int currentHour = addDurationToTime(time, i);
+    for (i = 0; i < targetBooking->duration; i++) {
+        int currentHour = addDurationToTime(targetBooking->time, i);
         int count = 0;
         for (j = 0; j < tempCount; j++) {
              
@@ -193,49 +194,53 @@ int isAvaliableEssential(int time, int duration, int target, int limit, int prio
 
     return 1; // available
 }
-
-int isAvalibleFCFS(int time, int duration, char essentials[7]) 
+bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB)
+{
+    return bookingA->priority >= bookingB->priority;
+}
+int isAvalibleFCFS(bookingInfo* targetBooking) 
 { 
-    if (essentials[6] == '1' && !isAvaliableEssential(time, duration, 6, 10, 5)) { // 5 for priority cuz no priority for fcfs
+    if (targetBooking->essentials[6] == '1' && !isAvaliableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
         return 0; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (essentials[i] == '1' && !isAvaliableEssential(time, duration, i, 3, 5)) {
+        if (targetBooking->essentials[i] == '1' && !isAvaliableEssential(targetBooking, i, 3, false)) {
             return 0; // Essential item is overbooked
         }
     }
 
     return 1; // Time slot is available
 } 
-int isAvaliblePR(int time, int duration, char essentials[7], int priority) 
+int isAvaliblePR(bookingInfo* targetBooking) 
 {
-    if (essentials[6] == '1' && !isAvaliableEssential(time, duration, 6, 10, priority)) {
+    if (targetBooking->essentials[6] == '1' && !isAvaliableEssential(targetBooking, 6, 10, true)) {
         return 0; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (essentials[i] == '1' && !isAvaliableEssential(time, duration, i, 3, priority)) {
+        if (targetBooking->essentials[i] == '1' && !isAvaliableEssential(targetBooking, i, 3, true)) {
             return 0; // Essential item is overbooked
         }
     }
 
-    // Step 1: Scan the booking list and save overlapping bookings with lower priority
+    // CANCEL BOOKINGS OVERWRITTEN BECAUSE LESS PRIORITY CODE  
     bookingInfo *cur = head;
     bookingInfo *temp[100];
     int tempCount = 0;
-    int newEndTime = addDurationToTime(time, duration);
+    int newEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
 
+    // 1- Scan the booking list and save overlapping bookings with lower priority
     while (cur != NULL) {
         int curEndTime = addDurationToTime(cur->time, cur->duration);
-        if (cur->priority > priority && 
-            ((time >= cur->time && time < curEndTime) || 
+        if (cur->priority > targetBooking->priority && 
+            ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
              (newEndTime > cur->time && newEndTime <= curEndTime) || 
-             (time <= cur->time && newEndTime >= curEndTime))) {
+             (targetBooking->time <= cur->time && newEndTime >= curEndTime))) {
             for (i = 0; i < 7; i++) {
-                if (essentials[i] == '1' && cur->essentials[i] == '1') {
+                if (targetBooking->essentials[i] == '1' && cur->essentials[i] == '1') {
                     temp[tempCount++] = cur;
                     break;
                 }
@@ -243,30 +248,50 @@ int isAvaliblePR(int time, int duration, char essentials[7], int priority)
         }
         cur = cur->next;
     }
+    // (NOT COMPLETE, NOT TESTED, NOT CORRECT)
+    // // 2- Remove the most overlapped booking first and then the next one if that one doesn't give enough resources
+    // for (i = 0; i < duration; i++) {
+    //     int currentHour = addDurationToTime(time, i);
+    //     int count[7] = {0}; // Array to count overlaps for each essential
+    //     bookingInfo *mostOverlapped = NULL;
+    //     int maxOverlaps = 0;
 
-    // Step 2: Set pAccepted flag to 0 for overlapping bookings until no more than 3 overlaps remain (10 for parking)
-    for (i = 0; i < duration; i++) {
-        int currentHour = addDurationToTime(time, i);
-        int count[7] = {0}; // Array to count overlaps for each essential
-        for (int j = 0; j < tempCount; j++) {
-            if (temp[j] == NULL) continue;
-            int tempEndTime = addDurationToTime(temp[j]->time, temp[j]->duration);
-            if (currentHour >= temp[j]->time && currentHour < tempEndTime) {
-                for (int k = 0; k < 7; k++) {
-                    if (essentials[k] == '1' && temp[j]->essentials[k] == '1') {
-                        count[k]++;
-                        int limit = (k == 6) ? 10 : 3; // Set limit based on essential type
-                        if (count[k] >= limit) {
-                            // Set pAccepted flag to 0
-                            temp[j]->pAccepted = 0;
-                            temp[j] = NULL; // Mark as processed
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //     // Count overlaps and find the most overlapped booking
+    //     for (int j = 0; j < tempCount; j++) {
+    //         if (temp[j] == NULL) continue;
+    //         int tempEndTime = addDurationToTime(temp[j]->time, temp[j]->duration);
+    //         if (currentHour >= temp[j]->time && currentHour < tempEndTime) {
+    //             for (int k = 0; k < 7; k++) {
+    //                 if (essentials[k] == '1' && temp[j]->essentials[k] == '1') {
+    //                     count[k]++;
+    //                     if (count[k] > maxOverlaps) {
+    //                         maxOverlaps = count[k];
+    //                         mostOverlapped = temp[j];
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     // Remove the most overlapped booking if it exceeds the limit
+    //     if (mostOverlapped != NULL) {
+    //         for (int k = 0; k < 7; k++) {
+    //             int limit = (k == 6) ? 10 : 3; // Set limit based on essential type
+    //             if (count[k] >= limit) {
+    //                 // Set pAccepted flag to 0
+    //                 mostOverlapped->pAccepted = 0;
+    //                 // Remove from temp array
+    //                 for (int j = 0; j < tempCount; j++) {
+    //                     if (temp[j] == mostOverlapped) {
+    //                         temp[j] = NULL;
+    //                         break;
+    //                     }
+    //                 }
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
 
     return 1; // Time slot is available
 }
@@ -364,8 +389,8 @@ bookingInfo* handleCreateBooking()
         free(newBooking);
         return NULL;
     } 
-    newBooking->fAccepted = isAvalibleFCFS(newBooking->time, newBooking->duration, newBooking->essentials); 
-    newBooking->pAccepted = isAvaliblePR(newBooking->time, newBooking->duration, newBooking->essentials, newBooking->priority); 
+    newBooking->fAccepted = isAvalibleFCFS(newBooking); 
+    newBooking->pAccepted = isAvaliblePR(newBooking); 
     newBooking->oAccepted = 0;   
     newBooking->next = NULL;
     return newBooking;
@@ -401,7 +426,7 @@ void CreateBookingFromCommand(int fd)
 
         insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation
         
-        // free(newBooking); // Free the booking
+        // free(newBooking); // Free the booking CAUSES BUG WHERE OLD BOOKING FORGOTTEN BY INSERTINTOBOOKINGS
     } else {
         write(fd, "fail", 4); // Tell parent that booking failed
     }
@@ -462,26 +487,26 @@ void printBookings()
     int member;
     printf("*** Parking Booking - ACCEPTED / FCFS ***\n\n");
     for (member = 1; member <= 5; member++) { 
-        handlePrintBooking(member, 1, 1); // fAccepted
+        handlePrintBooking(member, 1, 1); // member, isAccept, 1 = fcfs 2 = pr
     }
     printf("- End -\n");
     printf("===========================================================================\n");
     printf("*** Parking Booking - REJECTED / FCFS ***\n\n");
     for (member = 1; member <= 5; member++) { 
-        handlePrintBooking(member, 0, 1); // fAccepted
+        handlePrintBooking(member, 0, 1);  
     }
     printf("- End -\n");
 
     printf("===========================================================================\n");
     printf("*** Parking Booking - ACCEPTED / PRIORITY ***\n\n");
     for (member = 1; member <= 5; member++) { 
-        handlePrintBooking(member, 1, 2); // pAccepted
+        handlePrintBooking(member, 1, 2); 
     }
     printf("- End -\n");
     printf("===========================================================================\n");
     printf("*** Parking Booking - REJECTED / PRIORITY ***\n\n");
     for (member = 1; member <= 5; member++) { 
-        handlePrintBooking(member, 0, 2); // pAccepted
+        handlePrintBooking(member, 0, 2);  
     }
     printf("- End -\n");
 }
