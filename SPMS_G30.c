@@ -166,7 +166,7 @@ int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool
     while (cur != NULL) {
         int curEndTime = addDurationToTime(cur->time, cur->duration);
         int targetEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
-        if (cur->essentials[target] == '1' && (!checkPR || isMorePriorityThan(targetBooking, cur)) &&
+        if (cur->essentials[target] == '1' && (!checkPR || isMorePriorityThan(cur, targetBooking)) &&
             ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
             (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
             (targetBooking->time <= cur->time && targetEndTime >= curEndTime))) {
@@ -194,10 +194,46 @@ int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool
 
     return 1; // available
 }
-bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB)
-{
+
+bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB) {
+    // return bookingA->priority >= bookingB->priority;
+
+    
+    // NOT TESTED
+    // Define the priority window
+    int priorityStart = 800; // 08:00 AM
+    int priorityEnd = 2000;  // 08:00 PM
+
+    // Extract start and end times for both bookings
+    int startA = bookingA->time % 10000; // Extract HHMM from YYYYMMDDHHMM
+    int endA = addDurationToTime(bookingA->time, bookingA->duration) % 10000;
+    int startB = bookingB->time % 10000;
+    int endB = addDurationToTime(bookingB->time, bookingB->duration) % 10000;
+
+    // Check if booking A falls within the priority window
+    bool aInPriorityWindow = (startA < priorityEnd && endA > priorityStart);
+    // Check if booking B falls within the priority window
+    bool bInPriorityWindow = (startB < priorityEnd && endB > priorityStart);
+
+    // Compare based on priority window involvement
+    if (aInPriorityWindow && !bInPriorityWindow) {
+        return true;
+    } else if (!aInPriorityWindow && bInPriorityWindow) {
+        return false;
+    }
+
+    // Compare based on booking type priority
+    if (bookingA->priority == 1 && bookingB->priority != 1) { // Event has priority 1
+        return true;
+    } else if (bookingA->priority != 1 && bookingB->priority == 1) {
+        return false;
+    }
+
+    // If both bookings are of the same type and within/outside the priority window, compare priorities
     return bookingA->priority >= bookingB->priority;
 }
+
+
 int isAvalibleFCFS(bookingInfo* targetBooking) 
 { 
     if (targetBooking->essentials[6] == '1' && !isAvaliableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
@@ -235,7 +271,7 @@ int isAvaliblePR(bookingInfo* targetBooking)
     // 1- Scan the booking list and save overlapping bookings with lower priority
     while (cur != NULL) {
         int curEndTime = addDurationToTime(cur->time, cur->duration);
-        if (cur->priority > targetBooking->priority && 
+        if (isMorePriorityThan(targetBooking, cur) && 
             ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
              (newEndTime > cur->time && newEndTime <= curEndTime) || 
              (targetBooking->time <= cur->time && newEndTime >= curEndTime))) {
