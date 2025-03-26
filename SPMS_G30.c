@@ -16,12 +16,14 @@ typedef struct bookingInfo {
     int duration; // hours, 1 = 1 hour
     int member; // Member A to E (1 - 5)
     int priority; // Priority (1: Event, 2: Reservation, 3: Parking, 4: Essentials)
-    char essentials[7]; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services, normal parking) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
-    int fAccepted; // Accepted or not (First Come First Served)
-    int pAccepted; // Accepted or not (Priority)
-    int oAccepted; // Accepted or not (Optimized)
+    bool essentials[7]; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services, normal parking) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
+    bool fAccepted; // Accepted or not (First Come First Served)
+    bool pAccepted; // Accepted or not (Priority)
+    bool oAccepted; // Accepted or not (Optimized)
     struct bookingInfo *next;
 } bookingInfo;
+
+char essentialsName[6][18] = {"Locker", "Umbrella", "Battery", "Cable", "Valet parking", "Inflation service"};
 
 int invalidCount = 0; // Count of invalid request
 
@@ -32,22 +34,22 @@ bookingInfo *head = NULL;
 // get / is - helper function for logic
 
 void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking);
-int getEssentialSum(char *essentials);
-void handleSetEssentials(char *essentials, const char *command, bool includePaired);
+int getEssentialSum(bool *essentials);
+void handleSetEssentials(bool *essentials, const char *command, bool includePaired);
 int addDurationToTime(int time, int duration);
-bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB);
+bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB);
 int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR);
-int isAvalibleFCFS(bookingInfo* targetBooking);
-int isAvaliblePR(bookingInfo* targetBooking);
+int isAvalibleFCFS(bookingInfo *targetBooking);
+int isAvaliblePR(bookingInfo *targetBooking);
 bool isCorrectArgCount(int count);
-bookingInfo* handleCreateBooking();
+bookingInfo *handleCreateBooking();
 void setCommandFromString(char input[]);
 void CreateBookingFromCommand(int fd);
 void printFCFS();
 void printPR();
 void printOPT();
-void handlePrintBooking(int member, int isAccepted, int acceptedType);
-void importBatch(const char *filename, int fd); 
+void handlePrintBooking(int member, bool isAccepted, int acceptedType);
+void addBatch(const char *filename, int fd); 
 
 // Function to insert a booking into the sorted linked list
 void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking) 
@@ -82,12 +84,12 @@ void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking)
 }
 
 // return 3 for 000111, 2 for 010100, etc
-int getEssentialSum(char *essentials)
+int getEssentialSum(bool *essentials)
 {
     int i;
     int count = 0;
     for (i = 0; i < 6; i++) {
-        if (essentials[i] == '1') {
+        if (essentials[i]) {
             count++;
         }
     }
@@ -95,35 +97,35 @@ int getEssentialSum(char *essentials)
 }
 
 // take string parameters in COMMAND[] and set the 1 and 0s 
-void handleSetEssentials(char *essentials, const char *command, bool includePaired) 
+void handleSetEssentials(bool *essentials, const char *command, bool includePaired) 
 {
     // printf("essential to add: %s\n", command);
     if (strstr(command, "normalpark") != NULL) {
-        essentials[6] = '1';
+        essentials[6] = true;
 
     } else if (strstr(command, "locker") != NULL) {
-        essentials[0] = '1';
-        if (includePaired) essentials[1] = '1';
+        essentials[0] = true;
+        if (includePaired) essentials[1] = true;
     }
     else if (strstr(command, "umbrella") != NULL) {
-        essentials[1] = '1';
-        if (includePaired) essentials[0] = '1';
+        essentials[1] = true;
+        if (includePaired) essentials[0] = true;
     }
     else if (strstr(command, "battery") != NULL) {
-        essentials[2] = '1';
-        if (includePaired) essentials[3] = '1';
+        essentials[2] = true;
+        if (includePaired) essentials[3] = true;
     }
     else if (strstr(command, "cable") != NULL) {
-        essentials[3] = '1';
-        if (includePaired) essentials[2] = '1';
+        essentials[3] = true;
+        if (includePaired) essentials[2] = true;
     }
     else if (strstr(command, "valetpark") != NULL) {
-        essentials[4] = '1';
-        if (includePaired) essentials[5] = '1';
+        essentials[4] = true;
+        if (includePaired) essentials[5] = true;
     }
     else if (strstr(command, "inflationservice") != NULL) {
-        essentials[5] = '1';
-        if (includePaired) essentials[4] = '1';
+        essentials[5] = true;
+        if (includePaired) essentials[4] = true;
     }
 }
 
@@ -170,7 +172,7 @@ int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool
     while (cur != NULL) {
         int curEndTime = addDurationToTime(cur->time, cur->duration);
         int targetEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
-        if (cur->essentials[target] == '1' && (!checkPR || isMorePriorityThan(cur, targetBooking)) &&
+        if (cur->essentials[target] && (!checkPR || isMorePriorityThan(cur, targetBooking)) &&
             ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
             (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
             (targetBooking->time <= cur->time && targetEndTime >= curEndTime))) {
@@ -199,7 +201,7 @@ int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool
     return 1; // available
 }
 
-bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB) {
+bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
     // return bookingA->priority >= bookingB->priority;
 
 
@@ -238,30 +240,30 @@ bool isMorePriorityThan(bookingInfo* bookingA, bookingInfo* bookingB) {
 }
 
 
-int isAvalibleFCFS(bookingInfo* targetBooking) 
+int isAvalibleFCFS(bookingInfo *targetBooking) 
 { 
-    if (targetBooking->essentials[6] == '1' && !isAvaliableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
+    if (targetBooking->essentials[6] && !isAvaliableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
         return 0; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] == '1' && !isAvaliableEssential(targetBooking, i, 3, false)) {
+        if (targetBooking->essentials[i] && !isAvaliableEssential(targetBooking, i, 3, false)) {
             return 0; // Essential item is overbooked
         }
     }
 
     return 1; // Time slot is available
 } 
-int isAvaliblePR(bookingInfo* targetBooking) 
+int isAvaliblePR(bookingInfo *targetBooking) 
 {
-    if (targetBooking->essentials[6] == '1' && !isAvaliableEssential(targetBooking, 6, 10, true)) {
+    if (targetBooking->essentials[6] && !isAvaliableEssential(targetBooking, 6, 10, true)) {
         return 0; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] == '1' && !isAvaliableEssential(targetBooking, i, 3, true)) {
+        if (targetBooking->essentials[i] && !isAvaliableEssential(targetBooking, i, 3, true)) {
             return 0; // Essential item is overbooked
         }
     }
@@ -280,7 +282,7 @@ int isAvaliblePR(bookingInfo* targetBooking)
              (newEndTime > cur->time && newEndTime <= curEndTime) || 
              (targetBooking->time <= cur->time && newEndTime >= curEndTime))) {
             for (i = 0; i < 7; i++) {
-                if (targetBooking->essentials[i] == '1' && cur->essentials[i] == '1') {
+                if (targetBooking->essentials[i] && cur->essentials[i]) {
                     temp[tempCount++] = cur;
                     break;
                 }
@@ -302,7 +304,7 @@ int isAvaliblePR(bookingInfo* targetBooking)
     //         int tempEndTime = addDurationToTime(temp[j]->time, temp[j]->duration);
     //         if (currentHour >= temp[j]->time && currentHour < tempEndTime) {
     //             for (int k = 0; k < 7; k++) {
-    //                 if (essentials[k] == '1' && temp[j]->essentials[k] == '1') {
+    //                 if (essentials[k] && temp[j]->essentials[k]) {
     //                     count[k]++;
     //                     if (count[k] > maxOverlaps) {
     //                         maxOverlaps = count[k];
@@ -318,8 +320,8 @@ int isAvaliblePR(bookingInfo* targetBooking)
     //         for (int k = 0; k < 7; k++) {
     //             int limit = (k == 6) ? 10 : 3; // Set limit based on essential type
     //             if (count[k] >= limit) {
-    //                 // Set pAccepted flag to 0
-    //                 mostOverlapped->pAccepted = 0;
+    //                 // Set pAccepted flag to false
+    //                 mostOverlapped->pAccepted = false;
     //                 // Remove from temp array
     //                 for (int j = 0; j < tempCount; j++) {
     //                     if (temp[j] == mostOverlapped) {
@@ -336,7 +338,7 @@ int isAvaliblePR(bookingInfo* targetBooking)
     return 1; // Time slot is available
 }
 
-bookingInfo* handleCreateBooking() 
+bookingInfo *handleCreateBooking() 
 { 
     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
     
@@ -374,8 +376,11 @@ bookingInfo* handleCreateBooking()
     // Store the duration
     newBooking->duration = atoi(COMMAND[4]);
  
+    int i;
     // Convert priority and essentials to integer
-    strncpy(newBooking->essentials, "0000000", 7); 
+    for (i = 0; i < 7; i++) {
+        newBooking->essentials[i] = false;
+    }
     if (strcmp(COMMAND[0], "addEvent") == 0) {
         newBooking->priority = 1;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
@@ -431,7 +436,7 @@ bookingInfo* handleCreateBooking()
     } 
     newBooking->fAccepted = isAvalibleFCFS(newBooking); 
     newBooking->pAccepted = isAvaliblePR(newBooking); 
-    newBooking->oAccepted = 0;   
+    newBooking->oAccepted = false;   
     newBooking->next = NULL;
     return newBooking;
 }
@@ -453,16 +458,63 @@ void setCommandFromString(char input[])
     }
 }
 
+char *convertEssentialsToString(bool *essentials) {
+    char *essentialsString = malloc(8); // 7 char and 1 '\0'
+
+    for (int i = 0; i < 7; i++) {
+        essentialsString[i] = essentials[i] ? '1' : '0';
+    }
+    essentialsString[7] = '\0';
+
+    return essentialsString;
+}
+
+char *convertAcceptedToString(bool fAccepted, bool pAccepted, bool oAccepted) {
+    char *acceptedString = malloc(4); // 3 char and 1 '\0'
+
+    if (fAccepted) {
+        acceptedString[0] = '1';
+    }
+    else {
+        acceptedString[0] = '0';
+    }
+
+    if (pAccepted) {
+        acceptedString[1] = '1';
+    }
+    else {
+        acceptedString[1] = '0';
+    }
+
+    if (oAccepted) {
+        acceptedString[2] = '1';
+    }
+    else {
+        acceptedString[2] = '0';
+    }
+
+    acceptedString[3] = '\0';
+
+    return acceptedString;
+}
+
 void CreateBookingFromCommand(int fd) 
 {
     bookingInfo *newBooking = handleCreateBooking();
     if (newBooking != NULL) {
         char buff[100]; // Declare a large enough buffer to write the booking information
-        sprintf(buff, "done %d %d %d %d %s %d %d %d",
+
+        // Convert bool array to string for writing to parent
+        char *essentialsString = convertEssentialsToString(newBooking->essentials);
+        char *acceptedString = convertAcceptedToString(newBooking->fAccepted, newBooking->pAccepted, newBooking->oAccepted);
+
+        sprintf(buff, "done %d %d %d %d %s %s",
                 newBooking->time, newBooking->duration, newBooking->member,
-                newBooking->priority, newBooking->essentials, newBooking->fAccepted,
-                newBooking->pAccepted, newBooking->oAccepted); 
+                newBooking->priority, essentialsString, acceptedString); 
         write(fd, buff, sizeof(buff)); // Send booking info to parent
+
+        free(essentialsString);
+        free(acceptedString);
 
         insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation
         
@@ -472,8 +524,8 @@ void CreateBookingFromCommand(int fd)
     }
 }
 
-// importBatch -test_data_G30.dat 
-void importBatch(const char *filename, int fd) 
+// addBatch -test_data_G30.dat 
+void addBatch(const char *filename, int fd) 
 {
     FILE *file = fopen(filename + 1, "r"); // Ignore the first character '-'
     if (file == NULL) {
@@ -495,14 +547,46 @@ void importBatch(const char *filename, int fd)
     fclose(file);
 }
 
-void handlePrintBooking(int member, int isAccepted, int acceptedType) 
+int rejectedCount(int member, int acceptedType)
+{
+    int count = 0;
+    bookingInfo *cur = head;
+
+    bool rejected;
+    while (cur != NULL) {
+        switch (acceptedType) {
+            case 1:
+                rejected = !cur->fAccepted;
+                break;
+            case 2:
+                rejected = !cur->pAccepted;
+                break;
+            case 3:
+                rejected = !cur->oAccepted;
+                break;
+        }
+        if (cur->member == member && rejected) {
+            count++;
+        }
+        cur = cur->next;
+    }
+
+    return count;
+}
+
+void handlePrintBooking(int member, bool isAccepted, int acceptedType) 
 {
     bookingInfo *cur = head;
-    int accepted;
-    printf("===============================================\n");
-    printf("Member_%c has the following bookings:\n", 'A' + member - 1);
-    printf("Date       Start End   Type         Needs\n");
-    printf("-------------------------------------------\n");
+    bool accepted;
+    if (isAccepted) {
+        printf("\nMember_%c has the following bookings:\n", 'A' + member - 1);
+        printf("\nDate\t\tStart\tEnd\tType\t\tDevice");
+    }
+    else {
+        printf("\nMember_%c (there are %d bookings rejected):\n", 'A' + member - 1, rejectedCount(member, acceptedType));
+        printf("\nDate\t\tStart\tEnd\tType\t\tEssentials");
+    }
+    printf("\n===========================================================================\n");
     while (cur != NULL) { 
         switch (acceptedType) {
             case 1:
@@ -523,11 +607,39 @@ void handlePrintBooking(int member, int isAccepted, int acceptedType)
             int startHour = cur->time % 100;
             int endHour = startHour + cur->duration;
 
-            printf("%04d-%02d-%02d %02d:00 %02d:00 %-12s %s\n",
+            bool noEssential = true;
+            int i;
+            for (i = 0; i < 6; i++) { // Check the first 6 essentials (excluding the normal parking)
+                if (cur->essentials[i]) {
+                    noEssential = false;
+                    break;
+                }
+            }
+            if (noEssential) {
+                printf("%04d-%02d-%02d\t%02d:00\t%02d:00\t%-12s\t%c\n",
                     year, month, day,
                     startHour, endHour,
-                    cur->priority == 1 ? "Event" : cur->priority == 2 ? "Reservation" : cur->priority == 3 ? "Parking" : "Essentials",
-                    cur->essentials);
+                    cur->priority == 1 ? "Event" : cur->priority == 2 ? "Reservation" : cur->priority == 3 ? "Parking" : "*",
+                    '*');
+            }
+            else {
+                bool firstEssential = true; // First essential for current booking
+                printf("%04d-%02d-%02d\t%02d:00\t%02d:00\t%-12s\t",
+                    year, month, day,
+                    startHour, endHour,
+                    cur->priority == 1 ? "Event" : cur->priority == 2 ? "Reservation" : cur->priority == 3 ? "Parking" : "*");
+                for (i = 0; i < 6; i++) {
+                    if (cur->essentials[i]) {
+                        if (firstEssential) {
+                            printf("%s\n", essentialsName[i]);
+                            firstEssential = false;
+                        }
+                        else {
+                            printf("\t\t\t\t\t\t%s\n", essentialsName[i]);
+                        }
+                    }
+                }
+            }
         }
         cur = cur->next;
     }
@@ -537,55 +649,52 @@ void handlePrintBooking(int member, int isAccepted, int acceptedType)
 void printFCFS() 
 {
     int member;
-    printf("===========================================================================\n");
-    printf("===========================================================================\n");
-    printf("*** Parking Booking - ACCEPTED / FCFS ***\n\n");
+    printf("*** Parking Booking - ACCEPTED / FCFS ***\n");
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 1, 1); // member, isAccept, 1 = fcfs 2 = pr
     }
-    printf("- End -\n");
-    printf("===========================================================================\n");
-    printf("*** Parking Booking - REJECTED / FCFS ***\n\n");
+    printf("\t- End -\n");
+    printf("\n===========================================================================\n");
+    printf("*** Parking Booking - REJECTED / FCFS ***\n");
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 0, 1);  
     }
-    printf("- End -\n"); 
+    printf("\t- End -\n");
+    printf("\n===========================================================================\n");
 }
 
 void printPR() 
 {
     int member; 
-    printf("===========================================================================\n");
-    printf("===========================================================================\n");
-    printf("*** Parking Booking - ACCEPTED / PRIORITY ***\n\n");
+    printf("*** Parking Booking - ACCEPTED / PRIORITY ***\n");
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 1, 2); 
     }
-    printf("- End -\n");
-    printf("===========================================================================\n");
-    printf("*** Parking Booking - REJECTED / PRIORITY ***\n\n");
+    printf("\t- End -\n");
+    printf("\n===========================================================================\n");
+    printf("*** Parking Booking - REJECTED / PRIORITY ***\n");
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 0, 2);  
     }
-    printf("- End -\n");
+    printf("\t- End -\n");
+    printf("\n===========================================================================\n");
 }
 
 void printOPT()  
 {
     int member; 
-    printf("===========================================================================\n");
-    printf("===========================================================================\n");
-    printf("*** Parking Booking - ACCEPTED / OPTIMIZED ***\n\n");
+    printf("*** Parking Booking - ACCEPTED / OPTIMIZED ***\n");
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 1, 3); 
     }
-    printf("- End -\n");
-    printf("===========================================================================\n");
-    printf("*** Parking Booking - REJECTED / OPTIMIZED ***\n\n");
+    printf("\t- End -\n");
+    printf("\n===========================================================================\n");
+    printf("*** Parking Booking - REJECTED / OPTIMIZED ***\n");
     for (member = 1; member <= 5; member++) { 
         handlePrintBooking(member, 0, 3);  
     }
-    printf("- End -\n");
+    printf("\t- End -\n");
+    printf("\n===========================================================================\n");
 }
 
 int totalReceivedCount()
@@ -606,7 +715,7 @@ int totalAcceptedCount(int acceptedType)
     int count = 0;
     bookingInfo *cur = head;
 
-    int accepted;
+    bool accepted;
     while (cur != NULL) {
         switch (acceptedType) {
             case 1:
@@ -622,7 +731,7 @@ int totalAcceptedCount(int acceptedType)
         if (accepted) {
             count++;
         }
-        cur=cur->next;
+        cur = cur->next;
     }
 
     return count;
@@ -633,7 +742,7 @@ int utilizationCount(int essentialType, int acceptedType)
     int count = 0;
     bookingInfo *cur = head;
 
-    int accepted;
+    bool accepted;
     while (cur != NULL) {
         switch (acceptedType) {
             case 1:
@@ -647,11 +756,11 @@ int utilizationCount(int essentialType, int acceptedType)
                 break;
         }
         if (accepted) {
-            if (cur->essentials[essentialType] == '1') {
+            if (cur->essentials[essentialType]) {
                 count++;
             }
         }
-        cur=cur->next;
+        cur = cur->next;
     }
 
     return count;
@@ -667,6 +776,7 @@ void printReport()
         return;
     }
 
+    int i;
     fprintf(fd, "*** Parking Booking Manager - Summary Report ***\n");
     fprintf(fd, "\nPerformance:\n");
     fprintf(fd, "\nFor FCFS:\n");
@@ -679,18 +789,10 @@ void printReport()
     fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
     fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
-    utilization = utilizationCount(0, 1); // 0 for locker, 1 for FCFS
-    fprintf(fd, "\n\t\tlocker - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(1, 1); // 1 for umbrella, 1 for FCFS
-    fprintf(fd, "\n\t\tumbrella - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(2, 1); // 2 for battery, 1 for FCFS
-    fprintf(fd, "\n\t\tbattery - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(3, 1); // 3 for cable, 1 for FCFS
-    fprintf(fd, "\n\t\tcable - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(4, 1); // 4 for valet parking, 1 for FCFS
-    fprintf(fd, "\n\t\tvalet parking - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(5, 1); // 5 for inflation service, 1 for FCFS
-    fprintf(fd, "\n\t\tinflation service - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    for (i = 0; i < 6; i++) {
+        utilization = utilizationCount(i, 1); // 1 for FCFS
+        fprintf(fd, "\n\t\t%s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
+    }
     fprintf(fd, "\n\t Invalid request(s) made: %d\n", invalidCount);
 
     fprintf(fd, "\nFor PRIO:\n");
@@ -700,18 +802,10 @@ void printReport()
     fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
     fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
-    utilization = utilizationCount(0, 2); // 0 for locker, 2 for Priority
-    fprintf(fd, "\n\t\tlocker - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(1, 2); // 1 for umbrella, 2 for Priority
-    fprintf(fd, "\n\t\tumbrella - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(2, 2); // 2 for battery, 2 for Priority
-    fprintf(fd, "\n\t\tbattery - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(3, 2); // 3 for cable, 2 for Priority
-    fprintf(fd, "\n\t\tcable - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(4, 2); // 4 for valet parking, 2 for Priority
-    fprintf(fd, "\n\t\tvalet parking - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(5, 2); // 5 for inflation service, 2 for Priority
-    fprintf(fd, "\n\t\tinflation service - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    for (i = 0; i < 6; i++) {
+        utilization = utilizationCount(i, 2); // 2 for Priority
+        fprintf(fd, "\n\t\t%s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
+    }
     fprintf(fd, "\n\t Invalid request(s) made: %d\n", invalidCount);
 
     fprintf(fd, "\nFor OPTI:\n");
@@ -721,18 +815,10 @@ void printReport()
     fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
     fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
-    utilization = utilizationCount(0, 3); // 0 for locker, 3 for Optimized
-    fprintf(fd, "\n\t\tlocker - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(1, 3); // 1 for umbrella, 3 for Optimized
-    fprintf(fd, "\n\t\tumbrella - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(2, 3); // 2 for battery, 3 for Optimized
-    fprintf(fd, "\n\t\tbattery - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(3, 3); // 3 for cable, 3 for Optimized
-    fprintf(fd, "\n\t\tcable - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(4, 3); // 4 for valet parking, 3 for Optimized
-    fprintf(fd, "\n\t\tvalet parking - %.1f%%\n", (float)utilization / totalAccepted * 100);
-    utilization = utilizationCount(5, 3); // 5 for inflation service, 3 for Optimized
-    fprintf(fd, "\n\t\tinflation service - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    for (i = 0; i < 6; i++) {
+        utilization = utilizationCount(i, 3); // 3 for Optimized
+        fprintf(fd, "\n\t\t%s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
+    }
     fprintf(fd, "\n\t Invalid request(s) made: %d\n", invalidCount);
 
     fclose(fd);
@@ -768,19 +854,19 @@ int main() {
             // Write
             if (strcmp(COMMAND[0], "endProgram") == 0) {
                 write(fd[1], "end", 3); // Tell parent to end the program
-            }  else if (strcmp(COMMAND[0], "importBatch") == 0) { 
-                importBatch(COMMAND[1], fd[1]); 
+            }  else if (strcmp(COMMAND[0], "addBatch") == 0) { 
+                addBatch(COMMAND[1], fd[1]); 
             } else if (strcmp(COMMAND[0], "printBookings") == 0) { // Tell parent to print bookings
-                if (strcmp(COMMAND[1], "FCFS") == 0) {
+                if (strcmp(COMMAND[1], "-fcfs") == 0) {
                     write(fd[1], "FC", 3);  
                 }
-                else if (strcmp(COMMAND[1], "PR") == 0) {
+                else if (strcmp(COMMAND[1], "-prio") == 0) {
                     write(fd[1], "PR", 3);  
                 }
-                else if (strcmp(COMMAND[1], "OPT") == 0) {
+                else if (strcmp(COMMAND[1], "-opti") == 0) {
                     write(fd[1], "OP", 3);  
                 } 
-                else if (strcmp(COMMAND[1], "ALL") == 0) {
+                else if (strcmp(COMMAND[1], "-ALL") == 0) {
                     write(fd[1], "AL", 3);  
                 } 
             } else if (
@@ -791,7 +877,7 @@ int main() {
                 CreateBookingFromCommand(fd[1]);
             } else {
                 printf("invalid command, must be one of the following:\n");
-                printf("endProgram, importBatch, printBookings, addEvent, addParking, addParking, bookEssentials");
+                printf("endProgram, addBatch, printBookings, addEvent, addParking, addParking, bookEssentials\n");
                 write(fd[1], "invalid", 7);  
             }
             close(fd[1]); // Close child out
@@ -806,11 +892,43 @@ int main() {
                     break;
                 } else if (strncmp(buff, "done", 4) == 0) {
                     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
-                    sscanf(buff + 5, "%d %d %d %d %7s %d %d %d",
+                    char essentialsString[8]; // 8 is because the size of written essentialsString is 8 (including '\0')
+                    char acceptedString[4]; // 4 is because the size of written acceptedString is 4 (including '\0')
+                    sscanf(buff + 5, "%d %d %d %d %s %s",
                         &newBooking->time, &newBooking->duration, &newBooking->member,
-                        &newBooking->priority, newBooking->essentials, 
-                        &newBooking->fAccepted, &newBooking->pAccepted, &newBooking->oAccepted);
+                        &newBooking->priority, essentialsString, acceptedString);
                     newBooking->next = NULL;
+                    int i;
+                    for (i = 0; i < 7; i++) { // 7 is because we only need the first 7 char of essentialsString (excluding '\0')
+                        if (essentialsString[i] == '1') {
+                            newBooking->essentials[i] = true;
+                        }
+                        else {
+                            newBooking->essentials[i] = false;
+                        }
+                    }
+
+                    if (acceptedString[0] == '1') {
+                        newBooking->fAccepted = true;
+                    }
+                    else {
+                        newBooking->fAccepted = false;
+                    }
+
+                    if (acceptedString[1] == '1') {
+                        newBooking->pAccepted = true;
+                    }
+                    else {
+                        newBooking->pAccepted = false;
+                    }
+
+                    if (acceptedString[2] == '1') {
+                        newBooking->oAccepted = true;
+                    }
+                    else {
+                        newBooking->oAccepted = false;
+                    }
+
                     insertIntoBookings(&head, newBooking);
 
                     // DEBUG
@@ -820,9 +938,14 @@ int main() {
                     printf("Duration: %d\n", newBooking->duration);
                     printf("Member: %d\n", newBooking->member);
                     printf("Priority: %d\n", newBooking->priority);
-                    printf("Essentials: %s\n", newBooking->essentials);
-                    printf("fAccepted: %d\n", newBooking->fAccepted);
-                    printf("pAccepted: %d\n", newBooking->pAccepted); 
+                    printf("Essentials:\n");
+                    for (i = 0; i < 6; i++) {
+                        if (newBooking->essentials[i]) {
+                            printf("%s\n", essentialsName[i]);
+                        }
+                    }
+                    printf("fAccepted: %s\n", newBooking->fAccepted ? "True" : "False");
+                    printf("pAccepted: %s\n", newBooking->pAccepted ? "True" : "False"); 
                     // printf("oAccepted: %d\n", newBooking->oAccepted); 
                     
                 } else if (strncmp(buff, "FC", 3) == 0) {
