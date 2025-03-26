@@ -38,9 +38,9 @@ int getEssentialSum(bool *essentials);
 void handleSetEssentials(bool *essentials, const char *command, bool includePaired);
 int addDurationToTime(int time, int duration);
 bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB);
-int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR);
-int isAvalibleFCFS(bookingInfo *targetBooking);
-int isAvaliblePR(bookingInfo *targetBooking);
+bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR);
+bool isAvailableFCFS(bookingInfo *targetBooking);
+bool isAvailablePR(bookingInfo *targetBooking);
 bool isCorrectArgCount(int count);
 bookingInfo *handleCreateBooking();
 void setCommandFromString(char input[]);
@@ -162,7 +162,7 @@ int addDurationToTime(int time, int duration)
 }
 
 // helper method to check if enough number of batteries etc for one more booking to be in the target time and duration 
-int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR) 
+bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR) 
 { 
     bookingInfo *cur = head;
     bookingInfo *temp[100];
@@ -193,12 +193,12 @@ int isAvaliableEssential(bookingInfo *targetBooking, int target, int limit, bool
             int tempEndTime = addDurationToTime(temp[j]->time, temp[j]->duration);
             if (currentHour >= temp[j]->time && currentHour < tempEndTime) {
                 count++; 
-                if (count >= limit) return 0; // Overbooked
+                if (count >= limit) return false; // Overbooked
             }
         }
     }
 
-    return 1; // available
+    return true; // available
 }
 
 bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
@@ -240,31 +240,31 @@ bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
 }
 
 
-int isAvalibleFCFS(bookingInfo *targetBooking) 
+bool isAvailableFCFS(bookingInfo *targetBooking) 
 { 
     if (targetBooking->essentials[6] && !isAvaliableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
-        return 0; // parking is overbooked
+        return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
         if (targetBooking->essentials[i] && !isAvaliableEssential(targetBooking, i, 3, false)) {
-            return 0; // Essential item is overbooked
+            return false; // Essential item is overbooked
         }
     }
 
-    return 1; // Time slot is available
+    return true; // Time slot is available
 } 
-int isAvaliblePR(bookingInfo *targetBooking) 
+bool isAvailablePR(bookingInfo *targetBooking) 
 {
     if (targetBooking->essentials[6] && !isAvaliableEssential(targetBooking, 6, 10, true)) {
-        return 0; // parking is overbooked
+        return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
         if (targetBooking->essentials[i] && !isAvaliableEssential(targetBooking, i, 3, true)) {
-            return 0; // Essential item is overbooked
+            return false; // Essential item is overbooked
         }
     }
 
@@ -335,7 +335,7 @@ int isAvaliblePR(bookingInfo *targetBooking)
     //     }
     // }
 
-    return 1; // Time slot is available
+    return true; // Time slot is available
 }
 
 bookingInfo *handleCreateBooking() 
@@ -434,8 +434,8 @@ bookingInfo *handleCreateBooking()
         free(newBooking);
         return NULL;
     } 
-    newBooking->fAccepted = isAvalibleFCFS(newBooking); 
-    newBooking->pAccepted = isAvaliblePR(newBooking); 
+    newBooking->fAccepted = isAvailableFCFS(newBooking); 
+    newBooking->pAccepted = isAvailablePR(newBooking); 
     newBooking->oAccepted = false;   
     newBooking->next = NULL;
     return newBooking;
