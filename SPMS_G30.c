@@ -23,6 +23,8 @@ typedef struct bookingInfo {
     struct bookingInfo *next;
 } bookingInfo;
 
+int invalidCount = 0; // Count of invalid request
+
 char COMMAND[10][100];
 bookingInfo *head = NULL;
  
@@ -373,7 +375,7 @@ bookingInfo* handleCreateBooking()
     newBooking->duration = atoi(COMMAND[4]);
  
     // Convert priority and essentials to integer
-    strcpy(newBooking->essentials, "0000000"); 
+    strncpy(newBooking->essentials, "0000000", 7); 
     if (strcmp(COMMAND[0], "addEvent") == 0) {
         newBooking->priority = 1;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
@@ -585,11 +587,156 @@ void printOPT()
     }
     printf("- End -\n");
 }
-void printReport() // NOT DONE
+
+int totalReceivedCount()
 {
-    printf("===========================================================================\n");
-    printf("===========================================================================\n");
-    printf("PLACEHOLDER REPORT HERE\n");
+    int count = 0;
+    bookingInfo *cur = head;
+
+    while (cur != NULL) {
+        count++;
+        cur = cur->next;
+    }
+
+    return count;
+}
+
+int totalAcceptedCount(int acceptedType)
+{
+    int count = 0;
+    bookingInfo *cur = head;
+
+    int accepted;
+    while (cur != NULL) {
+        switch (acceptedType) {
+            case 1:
+                accepted = cur->fAccepted;
+                break;
+            case 2:
+                accepted = cur->pAccepted;
+                break;
+            case 3:
+                accepted = cur->oAccepted;
+                break;
+        }
+        if (accepted) {
+            count++;
+        }
+        cur=cur->next;
+    }
+
+    return count;
+}
+
+int utilizationCount(int essentialType, int acceptedType)
+{
+    int count = 0;
+    bookingInfo *cur = head;
+
+    int accepted;
+    while (cur != NULL) {
+        switch (acceptedType) {
+            case 1:
+                accepted = cur->fAccepted;
+                break;
+            case 2:
+                accepted = cur->pAccepted;
+                break;
+            case 3:
+                accepted = cur->oAccepted;
+                break;
+        }
+        if (accepted) {
+            if (cur->essentials[essentialType] == '1') {
+                count++;
+            }
+        }
+        cur=cur->next;
+    }
+
+    return count;
+}
+
+void printReport()
+{
+    FILE *fd;
+    fd = fopen("SPMS_Report_G30.txt", "w");
+
+    if (fd == NULL) {
+        printf("Error occurred when opening the report file\n");
+        return;
+    }
+
+    fprintf(fd, "*** Parking Booking Manager - Summary Report ***\n");
+    fprintf(fd, "\nPerformance:\n");
+    fprintf(fd, "\nFor FCFS:\n");
+    int totalRequest, totalReceived, totalAccepted, totalRejected, utilization;
+    totalReceived = totalReceivedCount();
+    totalRequest = totalReceived + invalidCount;
+    totalAccepted = totalAcceptedCount(1); // 1 for FCFS
+    totalRejected = totalReceived - totalAccepted;
+    fprintf(fd, "\tTotal Number of Bookings Received: %d (%.1f%%)\n", totalReceived, (float)totalReceived / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
+    fprintf(fd, "\n\t Utilization of Time Slot:\n");
+    utilization = utilizationCount(0, 1); // 0 for locker, 1 for FCFS
+    fprintf(fd, "\n\t\tlocker - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(1, 1); // 1 for umbrella, 1 for FCFS
+    fprintf(fd, "\n\t\tumbrella - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(2, 1); // 2 for battery, 1 for FCFS
+    fprintf(fd, "\n\t\tbattery - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(3, 1); // 3 for cable, 1 for FCFS
+    fprintf(fd, "\n\t\tcable - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(4, 1); // 4 for valet parking, 1 for FCFS
+    fprintf(fd, "\n\t\tvalet parking - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(5, 1); // 5 for inflation service, 1 for FCFS
+    fprintf(fd, "\n\t\tinflation service - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    fprintf(fd, "\n\t Invalid request(s) made: %d\n", invalidCount);
+
+    fprintf(fd, "\nFor PRIO:\n");
+    totalAccepted = totalAcceptedCount(2); // 2 for Priority
+    totalRejected = totalReceived - totalAccepted;
+    fprintf(fd, "\tTotal Number of Bookings Received: %d (%.1f%%)\n", totalReceived, (float)totalReceived / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
+    fprintf(fd, "\n\t Utilization of Time Slot:\n");
+    utilization = utilizationCount(0, 2); // 0 for locker, 2 for Priority
+    fprintf(fd, "\n\t\tlocker - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(1, 2); // 1 for umbrella, 2 for Priority
+    fprintf(fd, "\n\t\tumbrella - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(2, 2); // 2 for battery, 2 for Priority
+    fprintf(fd, "\n\t\tbattery - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(3, 2); // 3 for cable, 2 for Priority
+    fprintf(fd, "\n\t\tcable - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(4, 2); // 4 for valet parking, 2 for Priority
+    fprintf(fd, "\n\t\tvalet parking - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(5, 2); // 5 for inflation service, 2 for Priority
+    fprintf(fd, "\n\t\tinflation service - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    fprintf(fd, "\n\t Invalid request(s) made: %d\n", invalidCount);
+
+    fprintf(fd, "\nFor OPTI:\n");
+    totalAccepted = totalAcceptedCount(3); // 3 for Optimized
+    totalRejected = totalReceived - totalAccepted;
+    fprintf(fd, "\tTotal Number of Bookings Received: %d (%.1f%%)\n", totalReceived, (float)totalReceived / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
+    fprintf(fd, "\n\t Utilization of Time Slot:\n");
+    utilization = utilizationCount(0, 3); // 0 for locker, 3 for Optimized
+    fprintf(fd, "\n\t\tlocker - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(1, 3); // 1 for umbrella, 3 for Optimized
+    fprintf(fd, "\n\t\tumbrella - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(2, 3); // 2 for battery, 3 for Optimized
+    fprintf(fd, "\n\t\tbattery - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(3, 3); // 3 for cable, 3 for Optimized
+    fprintf(fd, "\n\t\tcable - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(4, 3); // 4 for valet parking, 3 for Optimized
+    fprintf(fd, "\n\t\tvalet parking - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    utilization = utilizationCount(5, 3); // 5 for inflation service, 3 for Optimized
+    fprintf(fd, "\n\t\tinflation service - %.1f%%\n", (float)utilization / totalAccepted * 100);
+    fprintf(fd, "\n\t Invalid request(s) made: %d\n", invalidCount);
+
+    fclose(fd);
+    printf("\nThe report has been written to the file successfully\n");
 }
 
 int main() {
@@ -645,6 +792,7 @@ int main() {
             } else {
                 printf("invalid command, must be one of the following:\n");
                 printf("endProgram, importBatch, printBookings, addEvent, addParking, addParking, bookEssentials");
+                write(fd[1], "invalid", 7);  
             }
             close(fd[1]); // Close child out
             exit(0);
@@ -690,6 +838,9 @@ int main() {
                     printReport();
                 } else if (strncmp(buff, "fail", 4) == 0) {
                     printf("Operation failed\n");
+                    invalidCount++;
+                } else if (strncmp(buff, "invalid", 7) == 0) {
+                    invalidCount++;
                 }
             }
             if (strncmp(buff, "end", 3) == 0) {
