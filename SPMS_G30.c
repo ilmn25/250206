@@ -39,6 +39,7 @@ void handleSetEssentials(bool *essentials, const char *command, bool includePair
 int addDurationToTime(int time, int duration);
 bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB);
 bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR);
+bool EvictEssential(bookingInfo *targetBooking);
 bool isAvailableFCFS(bookingInfo *targetBooking);
 bool isAvailablePR(bookingInfo *targetBooking);
 bool isCorrectArgCount(int count);
@@ -159,6 +160,27 @@ int addDurationToTime(int time, int duration)
     }
 
     return year * 1000000 + month * 10000 + day * 100 + hour;
+} 
+
+bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
+    if  (bookingA->priority != bookingB->priority) {
+        return bookingA->priority > bookingB->priority;
+    }
+
+    // extract start and end times for both bookings
+    int startA = bookingA->time % 10000; // Extract HHMM from YYYYMMDDHHMM
+    int endA = addDurationToTime(bookingA->time, bookingA->duration) % 10000;
+    int startB = bookingB->time % 10000;
+    int endB = addDurationToTime(bookingB->time, bookingB->duration) % 10000;
+
+    bool aInPriorityWindow = (startA < 2000 && endA > 800);
+    bool bInPriorityWindow = (startB < 2000 && endB > 800);
+
+    // if both in or both out then no difference aka not higher
+    if (aInPriorityWindow == bInPriorityWindow) {
+        return false;
+    } 
+    return aInPriorityWindow; 
 }
 
 // helper method to check if enough number of batteries etc for one more booking to be in the target time and duration 
@@ -168,10 +190,10 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, boo
     bookingInfo *temp[100];
     int tempCount = 0;
 
+    int targetEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
     // scan entire booking list and save (into temp) bookings that are overlapping AND has targeted essential AND more priority
-    while (cur != NULL) {
-        int curEndTime = addDurationToTime(cur->time, cur->duration);
-        int targetEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
+    while (cur != NULL && targetEndTime < cur-> time) {// because linked list is sorted by time, performant
+        int curEndTime = addDurationToTime(cur->time, cur->duration); 
         if (cur->essentials[target] && (!checkPR || isMorePriorityThan(cur, targetBooking)) &&
             ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
             (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
@@ -201,44 +223,33 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, boo
     return true; // available
 }
 
-bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
-    // return bookingA->priority >= bookingB->priority;
+bool EvictEssential(bookingInfo *targetBooking)  
+{
+    int i; //iterate  
+    // CANCEL BOOKINGS OVERWRITTEN BECAUSE LESS PRIORITY CODE  
+    bookingInfo *cur = head;
+    bookingInfo *temp[100];
+    int tempCount = 0;
+    int newEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
 
-
-    // NOT TESTED
-    // Define the priority window
-    int priorityStart = 800; // 08:00 AM
-    int priorityEnd = 2000;  // 08:00 PM
-
-    // Extract start and end times for both bookings
-    int startA = bookingA->time % 10000; // Extract HHMM from YYYYMMDDHHMM
-    int endA = addDurationToTime(bookingA->time, bookingA->duration) % 10000;
-    int startB = bookingB->time % 10000;
-    int endB = addDurationToTime(bookingB->time, bookingB->duration) % 10000;
-
-    // Check if booking A falls within the priority window
-    bool aInPriorityWindow = (startA < priorityEnd && endA > priorityStart);
-    // Check if booking B falls within the priority window
-    bool bInPriorityWindow = (startB < priorityEnd && endB > priorityStart);
-
-    // Compare based on priority window involvement
-    if (aInPriorityWindow && !bInPriorityWindow) {
-        return true;
-    } else if (!aInPriorityWindow && bInPriorityWindow) {
-        return false;
-    }
-
-    // Compare based on booking type priority
-    if (bookingA->priority == 1 && bookingB->priority != 1) { // Event has priority 1
-        return true;
-    } else if (bookingA->priority != 1 && bookingB->priority == 1) {
-        return false;
-    }
-
-    // If both bookings are of the same type and within/outside the priority window, compare priorities
-    return bookingA->priority >= bookingB->priority;
-}
-
+    // 1- Scan the booking list and save overlapping bookings with lower priority
+    while (cur != NULL) {
+        int curEndTime = addDurationToTime(cur->time, cur->duration);
+        if (isMorePriorityThan(targetBooking, cur) && 
+            ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
+             (newEndTime > cur->time && newEndTime <= curEndTime) || 
+             (targetBooking->time <= cur->time && newEndTime >= curEndTime))) {
+            for (i = 0; i < 7; i++) {
+                if (targetBooking->essentials[i] && cur->essentials[i]) {
+                    temp[tempCount++] = cur;
+                    break;
+                }
+            }
+        }
+        cur = cur->next;
+    } 
+    // 2- go through the list and cancel the booking with least priority, and repeat until enough no overbooking
+} 
 
 bool isAvailableFCFS(bookingInfo *targetBooking) 
 { 
@@ -267,74 +278,7 @@ bool isAvailablePR(bookingInfo *targetBooking)
             return false; // Essential item is overbooked
         }
     }
-
-    // CANCEL BOOKINGS OVERWRITTEN BECAUSE LESS PRIORITY CODE  
-    bookingInfo *cur = head;
-    bookingInfo *temp[100];
-    int tempCount = 0;
-    int newEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
-
-    // 1- Scan the booking list and save overlapping bookings with lower priority
-    while (cur != NULL) {
-        int curEndTime = addDurationToTime(cur->time, cur->duration);
-        if (isMorePriorityThan(targetBooking, cur) && 
-            ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
-             (newEndTime > cur->time && newEndTime <= curEndTime) || 
-             (targetBooking->time <= cur->time && newEndTime >= curEndTime))) {
-            for (i = 0; i < 7; i++) {
-                if (targetBooking->essentials[i] && cur->essentials[i]) {
-                    temp[tempCount++] = cur;
-                    break;
-                }
-            }
-        }
-        cur = cur->next;
-    }
-    // (NOT COMPLETE, NOT TESTED, NOT CORRECT)
-    // // 2- Remove the most overlapped booking first and then the next one if that one doesn't give enough resources
-    // for (i = 0; i < duration; i++) {
-    //     int currentHour = addDurationToTime(time, i);
-    //     int count[7] = {0}; // Array to count overlaps for each essential
-    //     bookingInfo *mostOverlapped = NULL;
-    //     int maxOverlaps = 0;
-
-    //     // Count overlaps and find the most overlapped booking
-    //     for (int j = 0; j < tempCount; j++) {
-    //         if (temp[j] == NULL) continue;
-    //         int tempEndTime = addDurationToTime(temp[j]->time, temp[j]->duration);
-    //         if (currentHour >= temp[j]->time && currentHour < tempEndTime) {
-    //             for (int k = 0; k < 7; k++) {
-    //                 if (essentials[k] && temp[j]->essentials[k]) {
-    //                     count[k]++;
-    //                     if (count[k] > maxOverlaps) {
-    //                         maxOverlaps = count[k];
-    //                         mostOverlapped = temp[j];
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     // Remove the most overlapped booking if it exceeds the limit
-    //     if (mostOverlapped != NULL) {
-    //         for (int k = 0; k < 7; k++) {
-    //             int limit = (k == 6) ? 10 : 3; // Set limit based on essential type
-    //             if (count[k] >= limit) {
-    //                 // Set pAccepted flag to false
-    //                 mostOverlapped->pAccepted = false;
-    //                 // Remove from temp array
-    //                 for (int j = 0; j < tempCount; j++) {
-    //                     if (temp[j] == mostOverlapped) {
-    //                         temp[j] = NULL;
-    //                         break;
-    //                     }
-    //                 }
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
-
+    EvictEssential(targetBooking);
     return true; // Time slot is available
 }
 
