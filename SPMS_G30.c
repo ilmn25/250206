@@ -37,9 +37,9 @@ void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking);
 int getEssentialSum(bool *essentials);
 void handleSetEssentials(bool *essentials, const char *command, bool includePaired);
 int addDurationToTime(int time, int duration);
-bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB);
-bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR);
-bool EvictEssential(bookingInfo *targetBooking);
+bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB, bool includeSame);
+bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int mode);
+void EvictEssential(bookingInfo *targetBooking);
 bool isAvailableFCFS(bookingInfo *targetBooking);
 bool isAvailablePR(bookingInfo *targetBooking);
 bool isCorrectArgCount(int count);
@@ -162,9 +162,9 @@ int addDurationToTime(int time, int duration)
     return year * 1000000 + month * 10000 + day * 100 + hour;
 } 
 
-bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
+bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB, bool includeSame) {
     if  (bookingA->priority != bookingB->priority) {
-        return bookingA->priority > bookingB->priority;
+        return bookingA->priority < bookingB->priority;
     }
 
     // extract start and end times for both bookings
@@ -178,26 +178,29 @@ bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
 
     // if both in or both out then no difference aka not higher
     if (aInPriorityWindow == bInPriorityWindow) {
-        return false;
+        return includeSame;
     } 
     return aInPriorityWindow; 
 }
 
 // helper method to check if enough number of batteries etc for one more booking to be in the target time and duration 
-bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, bool checkPR) 
+bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int mode) 
 { 
     bookingInfo *cur = head;
     bookingInfo *temp[100];
     int tempCount = 0;
 
     // scan entire booking list and save (into temp) bookings that are overlapping AND has targeted essential AND more priority
-    while (cur != NULL && targetBooking->endTime < cur-> startTime) {// because linked list is sorted by time, performant
-        if (cur->essentials[target] && (!checkPR || isMorePriorityThan(cur, targetBooking)) &&
+    while (cur != NULL) {// because linked list is sorted by time, performant
+        if (cur->essentials[target] && 
+            ((mode == 1 && cur->pAccepted && isMorePriorityThan(cur, targetBooking, true)) ||
+            (mode == 2  && cur->fAccepted) ||
+            (mode == 3  && cur->pAccepted)) && 
             ((targetBooking->startTime >= cur->startTime && targetBooking->startTime < cur->endTime) || 
             (targetBooking->endTime > cur->startTime && targetBooking->endTime <= cur->endTime) ||
             (targetBooking->startTime <= cur->startTime && targetBooking->endTime >= cur->endTime))) {
             // Add cur to temp list
-            temp[tempCount++] = cur; 
+            temp[tempCount++] = cur;  
         }
         cur = cur->next;
     }
@@ -211,7 +214,7 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, boo
         for (j = 0; j < tempCount; j++) {
              
             if (currentHour >= temp[j]->startTime && currentHour < temp[j]->endTime) {
-                count++; 
+                count++;  
                 if (count >= limit) return false; // Overbooked
             }
         }
@@ -220,8 +223,15 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, boo
 
     return true; // available
 }
-
-bool EvictEssential(bookingInfo *targetBooking)  
+bool isOverlapEssentials(bookingInfo* bookingA, bookingInfo* bookingB) {
+    for (int i = 0; i < 7; ++i) {
+        if (bookingA->essentials[i] && bookingB->essentials[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+void EvictEssential(bookingInfo *targetBooking)  
 {
     int i; //iterate  
     // CANCEL BOOKINGS OVERWRITTEN BECAUSE LESS PRIORITY CODE  
@@ -230,8 +240,8 @@ bool EvictEssential(bookingInfo *targetBooking)
     int tempCount = 0;
 
     // 1- Scan the booking list and save overlapping bookings with lower priority
-    while (cur != NULL && targetBooking->endTime < cur-> startTime) {// because linked list is sorted by time, performant
-        if (isMorePriorityThan(targetBooking, cur) && 
+    while (cur != NULL) {// because linked list is sorted by time, performant
+        if (cur->pAccepted && isOverlapEssentials(targetBooking, cur) && isMorePriorityThan(targetBooking, cur, false) && 
             ((targetBooking->startTime >= cur->startTime && targetBooking->startTime < cur->endTime) || 
              (targetBooking->endTime > cur->startTime && targetBooking->endTime <= cur->endTime) || 
              (targetBooking->startTime <= cur->startTime && targetBooking->endTime >= cur->endTime))) {
@@ -244,18 +254,41 @@ bool EvictEssential(bookingInfo *targetBooking)
         }
         cur = cur->next;
     } 
-    // 2- go through the list and cancel the booking with least priority, and repeat until enough no overbooking
-} 
+            printf("BOOM %d\n", tempCount);
+
+    // CHECK IF CORRECTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+    // 2- Go through the list and cancel the booking with least priority, and repeat until no overbooking
+    for (int i = 0; i < 7; ++i) {
+        if (!targetBooking->essentials[i]) continue; //4 and 11 because need to be "just full", not "have spare spot available"
+        while ((i != 6 && !isAvailableEssential(targetBooking, i, 3, 3)) || (i == 6 && !isAvailableEssential(targetBooking, 6, 10, 3))) {
+            // Get lowest priority in temp
+            int target = 0;
+            for (int j = 0; j < tempCount; j++) {
+                if (temp[j] != NULL && (temp[target] == NULL || isMorePriorityThan(temp[target], temp[j], false))) {
+                    target = j;
+                }
+            }
+
+            // Remove it from temp and set its pAccepted flag to false
+            temp[target]->pAccepted = false;
+            // printf("NUKED %d\n", temp[target]->priority);
+            // IT NEEDS TO SET P ACCEPTED TO FALSE IN MAIN PROCESS NOT HERE!!! 
+            // 🔰🚸☣❇☢🚸🚸⚠☣🚸🔰🔰🚸🚸🚸⚠⚠⚠⚠
+            // 🔰🚸☣❇☢🚸🚸⚠☣🚸🔰🔰🚸🚸🚸⚠⚠⚠⚠
+            temp[target] = NULL;  
+        }
+    }
+}
 
 bool isAvailableFCFS(bookingInfo *targetBooking) 
 { 
-    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
+    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 2)) {  
         return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, false)) {
+        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, 2)) {
             return false; // Essential item is overbooked
         }
     }
@@ -264,13 +297,13 @@ bool isAvailableFCFS(bookingInfo *targetBooking)
 } 
 bool isAvailablePR(bookingInfo *targetBooking) 
 {
-    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, true)) {
+    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 1)) {
         return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, true)) {
+        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, 1)) {
             return false; // Essential item is overbooked
         }
     }
@@ -543,7 +576,7 @@ void handlePrintBooking(int member, bool isAccepted, int acceptedType)
             int month = (cur->startTime / 10000) % 100;
             int day = (cur->startTime / 100) % 100;
             int startHour = cur->startTime % 100;
-            int endHour = startHour + cur->endTime;
+            int endHour = cur->endTime % 100;
 
             bool noEssential = true;
             int i;
@@ -806,7 +839,9 @@ int main() {
                 } 
                 else if (strcmp(COMMAND[1], "-ALL") == 0) {
                     write(fd[1], "AL", 3);  
-                } 
+                } else {
+                    printf("invalid command");
+                }
             } else if (
             strcmp(COMMAND[0], "addEvent") == 0 ||
             strcmp(COMMAND[0], "addReservation") == 0 ||
