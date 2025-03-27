@@ -12,8 +12,8 @@
 
 // Using linked list to store the booking information
 typedef struct bookingInfo {
-    int time; // YYYYMMDDHH
-    int duration; // hours, 1 = 1 hour
+    int startTime; // YYYYMMDDHH
+    int endTime; // YYYYMMDDHH
     int member; // Member A to E (1 - 5)
     int priority; // Priority (1: Event, 2: Reservation, 3: Parking, 4: Essentials)
     bool essentials[7]; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services, normal parking) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
@@ -59,7 +59,7 @@ void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking)
     bookingInfo *pre = NULL;
 
     while (cur != NULL) {
-        if (cur->time > newBooking->time) {
+        if (cur->startTime > newBooking->startTime) {
             if (pre == NULL) {
                 newBooking->next = *head;
                 *head = newBooking;
@@ -158,7 +158,7 @@ int addDurationToTime(int time, int duration)
             year++;
         }
     }
-
+    
     return year * 1000000 + month * 10000 + day * 100 + hour;
 } 
 
@@ -168,10 +168,10 @@ bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB) {
     }
 
     // extract start and end times for both bookings
-    int startA = bookingA->time % 10000; // Extract HHMM from YYYYMMDDHHMM
-    int endA = addDurationToTime(bookingA->time, bookingA->duration) % 10000;
-    int startB = bookingB->time % 10000;
-    int endB = addDurationToTime(bookingB->time, bookingB->duration) % 10000;
+    int startA = bookingA->startTime % 10000; // Extract HHMM from YYYYMMDDHHMM
+    int endA = bookingA->endTime % 10000;
+    int startB = bookingB->startTime % 10000;
+    int endB = bookingB->endTime % 10000;
 
     bool aInPriorityWindow = (startA < 2000 && endA > 800);
     bool bInPriorityWindow = (startB < 2000 && endB > 800);
@@ -190,14 +190,12 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, boo
     bookingInfo *temp[100];
     int tempCount = 0;
 
-    int targetEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
     // scan entire booking list and save (into temp) bookings that are overlapping AND has targeted essential AND more priority
-    while (cur != NULL && targetEndTime < cur-> time) {// because linked list is sorted by time, performant
-        int curEndTime = addDurationToTime(cur->time, cur->duration); 
+    while (cur != NULL && targetBooking->endTime < cur-> startTime) {// because linked list is sorted by time, performant
         if (cur->essentials[target] && (!checkPR || isMorePriorityThan(cur, targetBooking)) &&
-            ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
-            (targetEndTime > cur->time && targetEndTime <= curEndTime) ||
-            (targetBooking->time <= cur->time && targetEndTime >= curEndTime))) {
+            ((targetBooking->startTime >= cur->startTime && targetBooking->startTime < cur->endTime) || 
+            (targetBooking->endTime > cur->startTime && targetBooking->endTime <= cur->endTime) ||
+            (targetBooking->startTime <= cur->startTime && targetBooking->endTime >= cur->endTime))) {
             // Add cur to temp list
             temp[tempCount++] = cur; 
         }
@@ -207,17 +205,17 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, boo
     // i - iterate through each hour in target time period
     // j - iterate through each overlapping temp to see if more than [limit] overlaps (3 for essentials or 10 for parking)
     int i, j;
-    for (i = 0; i < targetBooking->duration; i++) {
-        int currentHour = addDurationToTime(targetBooking->time, i);
+    int currentHour = targetBooking->startTime;
+    while (currentHour <= targetBooking->endTime) { //go through each hour until reach endtime 
         int count = 0;
         for (j = 0; j < tempCount; j++) {
              
-            int tempEndTime = addDurationToTime(temp[j]->time, temp[j]->duration);
-            if (currentHour >= temp[j]->time && currentHour < tempEndTime) {
+            if (currentHour >= temp[j]->startTime && currentHour < temp[j]->endTime) {
                 count++; 
                 if (count >= limit) return false; // Overbooked
             }
         }
+        currentHour = addDurationToTime(currentHour, 1);  
     }
 
     return true; // available
@@ -230,15 +228,13 @@ bool EvictEssential(bookingInfo *targetBooking)
     bookingInfo *cur = head;
     bookingInfo *temp[100];
     int tempCount = 0;
-    int newEndTime = addDurationToTime(targetBooking->time, targetBooking->duration);
 
     // 1- Scan the booking list and save overlapping bookings with lower priority
-    while (cur != NULL) {
-        int curEndTime = addDurationToTime(cur->time, cur->duration);
+    while (cur != NULL && targetBooking->endTime < cur-> startTime) {// because linked list is sorted by time, performant
         if (isMorePriorityThan(targetBooking, cur) && 
-            ((targetBooking->time >= cur->time && targetBooking->time < curEndTime) || 
-             (newEndTime > cur->time && newEndTime <= curEndTime) || 
-             (targetBooking->time <= cur->time && newEndTime >= curEndTime))) {
+            ((targetBooking->startTime >= cur->startTime && targetBooking->startTime < cur->endTime) || 
+             (targetBooking->endTime > cur->startTime && targetBooking->endTime <= cur->endTime) || 
+             (targetBooking->startTime <= cur->startTime && targetBooking->endTime >= cur->endTime))) {
             for (i = 0; i < 7; i++) {
                 if (targetBooking->essentials[i] && cur->essentials[i]) {
                     temp[tempCount++] = cur;
@@ -253,13 +249,13 @@ bool EvictEssential(bookingInfo *targetBooking)
 
 bool isAvailableFCFS(bookingInfo *targetBooking) 
 { 
-    if (targetBooking->essentials[6] && !isAvaliableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
+    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, false)) { // 5 for priority cuz no priority for fcfs
         return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] && !isAvaliableEssential(targetBooking, i, 3, false)) {
+        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, false)) {
             return false; // Essential item is overbooked
         }
     }
@@ -268,13 +264,13 @@ bool isAvailableFCFS(bookingInfo *targetBooking)
 } 
 bool isAvailablePR(bookingInfo *targetBooking) 
 {
-    if (targetBooking->essentials[6] && !isAvaliableEssential(targetBooking, 6, 10, true)) {
+    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, true)) {
         return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] && !isAvaliableEssential(targetBooking, i, 3, true)) {
+        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, true)) {
             return false; // Essential item is overbooked
         }
     }
@@ -315,11 +311,10 @@ bookingInfo *handleCreateBooking()
         free(newBooking);
         return NULL;
     }
-    newBooking->time = year * 1000000 + month * 10000 + day * 100 + hour;
+    newBooking->startTime = year * 1000000 + month * 10000 + day * 100 + hour;
 
     // Store the duration
-    newBooking->duration = atoi(COMMAND[4]);
- 
+    newBooking->endTime = addDurationToTime(newBooking->startTime, atoi(COMMAND[4]));
     int i;
     // Convert priority and essentials to integer
     for (i = 0; i < 7; i++) {
@@ -443,9 +438,9 @@ char *convertAcceptedToString(bool fAccepted, bool pAccepted, bool oAccepted) {
 }
 
 void CreateBookingFromCommand(int fd) 
-{
-    bookingInfo *newBooking = handleCreateBooking();
-    if (newBooking != NULL) {
+{  
+    bookingInfo *newBooking = handleCreateBooking();  
+    if (newBooking != NULL) { 
         char buff[100]; // Declare a large enough buffer to write the booking information
 
         // Convert bool array to string for writing to parent
@@ -453,15 +448,14 @@ void CreateBookingFromCommand(int fd)
         char *acceptedString = convertAcceptedToString(newBooking->fAccepted, newBooking->pAccepted, newBooking->oAccepted);
 
         sprintf(buff, "done %d %d %d %d %s %s",
-                newBooking->time, newBooking->duration, newBooking->member,
+                newBooking->startTime, newBooking->endTime, newBooking->member,
                 newBooking->priority, essentialsString, acceptedString); 
         write(fd, buff, sizeof(buff)); // Send booking info to parent
 
         free(essentialsString);
         free(acceptedString);
 
-        insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation
-        
+        insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation 
         // free(newBooking); // Free the booking CAUSES BUG WHERE OLD BOOKING FORGOTTEN BY INSERTINTOBOOKINGS
     } else {
         write(fd, "fail", 4); // Tell parent that booking failed
@@ -545,11 +539,11 @@ void handlePrintBooking(int member, bool isAccepted, int acceptedType)
         }
 
         if (cur->member == member && accepted == isAccepted) {
-            int year = cur->time / 1000000;
-            int month = (cur->time / 10000) % 100;
-            int day = (cur->time / 100) % 100;
-            int startHour = cur->time % 100;
-            int endHour = startHour + cur->duration;
+            int year = cur->startTime / 1000000;
+            int month = (cur->startTime / 10000) % 100;
+            int day = (cur->startTime / 100) % 100;
+            int startHour = cur->startTime % 100;
+            int endHour = startHour + cur->endTime;
 
             bool noEssential = true;
             int i;
@@ -777,8 +771,8 @@ int main() {
         
         // get input (typed in by user)
         char line[100];
-        scanf(" %[^\n]", line);
-        setCommandFromString(line);
+        scanf(" %[^\n]", line); 
+        setCommandFromString(line); 
         
         printf("\n");
          
@@ -788,13 +782,13 @@ int main() {
             printf("Pipe created error\n");
             exit(1);
         }
-        pid = fork();
+        pid = fork(); 
         if (pid < 0) {
             printf("Fork failed\n");
             exit(1);
         }
-        else if (pid == 0) {
-            close(fd[0]); // Close child in
+        else if (pid == 0) { 
+            close(fd[0]); // Close child in 
             // Write
             if (strcmp(COMMAND[0], "endProgram") == 0) {
                 write(fd[1], "end", 3); // Tell parent to end the program
@@ -817,7 +811,7 @@ int main() {
             strcmp(COMMAND[0], "addEvent") == 0 ||
             strcmp(COMMAND[0], "addReservation") == 0 ||
             strcmp(COMMAND[0], "addParking") == 0 ||
-            strcmp(COMMAND[0], "bookEssentials") == 0 ) {
+            strcmp(COMMAND[0], "bookEssentials") == 0 ) {  
                 CreateBookingFromCommand(fd[1]);
             } else {
                 printf("invalid command, must be one of the following:\n");
@@ -839,7 +833,7 @@ int main() {
                     char essentialsString[8]; // 8 is because the size of written essentialsString is 8 (including '\0')
                     char acceptedString[4]; // 4 is because the size of written acceptedString is 4 (including '\0')
                     sscanf(buff + 5, "%d %d %d %d %s %s",
-                        &newBooking->time, &newBooking->duration, &newBooking->member,
+                        &newBooking->startTime, &newBooking->endTime, &newBooking->member,
                         &newBooking->priority, essentialsString, acceptedString);
                     newBooking->next = NULL;
                     int i;
@@ -878,8 +872,8 @@ int main() {
                     // DEBUG
                     printf("--------------------------\n");
                     printf("New Booking:\n");
-                    printf("Time: %d\n", newBooking->time);
-                    printf("Duration: %d\n", newBooking->duration);
+                    printf("start: %d\n", newBooking->startTime);
+                    printf("end: %d\n", newBooking->endTime);
                     printf("Member: %d\n", newBooking->member);
                     printf("Priority: %d\n", newBooking->priority);
                     printf("Essentials:\n");
