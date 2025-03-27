@@ -224,7 +224,8 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int
     return true; // available
 }
 bool isOverlapEssentials(bookingInfo* bookingA, bookingInfo* bookingB) {
-    for (int i = 0; i < 7; ++i) {
+    int i;
+    for (i = 0; i < 7; ++i) {
         if (bookingA->essentials[i] && bookingB->essentials[i]) {
             return true;
         }
@@ -256,14 +257,15 @@ void EvictEssential(bookingInfo *targetBooking)
     } 
             printf("BOOM %d\n", tempCount);
 
+    int j;
     // CHECK IF CORRECTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
     // 2- Go through the list and cancel the booking with least priority, and repeat until no overbooking
-    for (int i = 0; i < 7; ++i) {
+    for (i = 0; i < 7; ++i) {
         if (!targetBooking->essentials[i]) continue; //4 and 11 because need to be "just full", not "have spare spot available"
         while ((i != 6 && !isAvailableEssential(targetBooking, i, 3, 3)) || (i == 6 && !isAvailableEssential(targetBooking, 6, 10, 3))) {
             // Get lowest priority in temp
             int target = 0;
-            for (int j = 0; j < tempCount; j++) {
+            for (j = 0; j < tempCount; j++) {
                 if (temp[j] != NULL && (temp[target] == NULL || isMorePriorityThan(temp[target], temp[j], false))) {
                     target = j;
                 }
@@ -433,7 +435,8 @@ void setCommandFromString(char input[])
 char *convertEssentialsToString(bool *essentials) {
     char *essentialsString = malloc(8); // 7 char and 1 '\0'
 
-    for (int i = 0; i < 7; i++) {
+    int i;
+    for (i = 0; i < 7; i++) {
         essentialsString[i] = essentials[i] ? '1' : '0';
     }
     essentialsString[7] = '\0';
@@ -599,6 +602,8 @@ void handlePrintBooking(int member, bool isAccepted, int acceptedType)
                     year, month, day,
                     startHour, endHour,
                     cur->priority == 1 ? "Event" : cur->priority == 2 ? "Reservation" : cur->priority == 3 ? "Parking" : "*");
+                
+                // Print the essentials for this booking
                 for (i = 0; i < 6; i++) {
                     if (cur->essentials[i]) {
                         if (firstEssential) {
@@ -740,7 +745,7 @@ int utilizationCount(int essentialType, int acceptedType)
 void printReport()
 {
     FILE *fd;
-    fd = fopen("SPMS_Report_G30.txt", "w");
+    fd = fopen("SPMS_Report_G30.txt", "w"); // Open the report file with write mode
 
     if (fd == NULL) {
         printf("Error occurred when opening the report file\n");
@@ -760,6 +765,7 @@ void printReport()
     fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
     fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
+    // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
         utilization = utilizationCount(i, 1); // 1 for FCFS
         fprintf(fd, "\n\t\t%s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
@@ -773,6 +779,7 @@ void printReport()
     fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
     fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
+    // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
         utilization = utilizationCount(i, 2); // 2 for Priority
         fprintf(fd, "\n\t\t%s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
@@ -786,13 +793,14 @@ void printReport()
     fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
     fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
+    // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
         utilization = utilizationCount(i, 3); // 3 for Optimized
         fprintf(fd, "\n\t\t%s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
     }
     fprintf(fd, "\n\t Invalid request(s) made: %d\n", invalidCount);
 
-    fclose(fd);
+    fclose(fd); // Close the report file
     printf("\nThe report has been written to the file successfully\n");
 }
 
