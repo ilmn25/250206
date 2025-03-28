@@ -288,11 +288,9 @@ void EvictEssential(bookingInfo *targetBooking)
             printf("BOOM %d\n", tempCount);
 
     int j;
-    targetBooking->num = 0;
-    targetBooking->overwrittenIDs = NULL; // Initialize the pointer of overwrittenIDs to NULL
     // CHECK IF CORRECTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
     // 2- Go through the list and cancel the booking with least priority, and repeat until no overbooking
-    for (i = 0; i < 7; ++i) {
+    for (i = 0; i < 7; i++) {
         if (!targetBooking->essentials[i]) continue; //4 and 11 because need to be "just full", not "have spare spot available"
         while ((i != 6 && !isAvailableEssential(targetBooking, i, 3, 3)) || (i == 6 && !isAvailableEssential(targetBooking, 6, 10, 3))) {
             // Get lowest priority in temp
@@ -464,6 +462,8 @@ bookingInfo *handleCreateBooking()
         return NULL;
     }
 
+    newBooking->num = 0;
+    newBooking->overwrittenIDs = NULL; // Initialize the pointer of overwrittenIDs to NULL
     newBooking->fAccepted = isAvailableFCFS(newBooking); 
     newBooking->pAccepted = isAvailablePR(newBooking); 
     newBooking->oAccepted = false;   
@@ -509,11 +509,13 @@ void CreateBookingFromCommand(int fd)
         // Convert bool array to string for writing to parent
         char *essentialsString = convertEssentialsToString(newBooking->essentials);
 
-        sprintf(buff, "done %d %d %d %d %s %d %d %d %d %d",
+        sprintf(buff, "done %d %d %d %d %s %d %d %d %d %d ",
                 newBooking->startTime, newBooking->endTime, newBooking->member,
-                newBooking->priority, essentialsString, newBooking->fAccepted, newBooking->pAccepted, newBooking->oAccepted, newBooking->bookingID, newBooking->num);
+                newBooking->priority, essentialsString, (int)newBooking->fAccepted,
+                (int)newBooking->pAccepted, (int)newBooking->oAccepted, newBooking->bookingID, newBooking->num);
+        int i;
         // Appending each item in overwrittenIDs to buff
-        for (int i = 0; i < newBooking->num; i++) {
+        for (i = 0; i < newBooking->num; i++) {
             sprintf(buff + strlen(buff), "%d ", newBooking->overwrittenIDs[i]);
         }
         write(fd, buff, sizeof(buff)); // Send booking info to parent
@@ -868,10 +870,12 @@ void cancelBookings(bookingInfo *newBooking)
 {
     int num;
     bookingInfo *cur = head;
+    printf("\nThere is %d booking needs to be cancelled. BOOKINGID: %d\n", newBooking->num, newBooking->overwrittenIDs[0]);
     while (cur != NULL) {
         for (num = 0; num < newBooking->num; num++) {
             if (cur->bookingID == newBooking->overwrittenIDs[num] && cur->pAccepted) {
                 cur->pAccepted = false;
+                printf("\nBookingID: %d Cancelled\n", cur->bookingID);
             }
         }
         cur = cur->next;
@@ -951,7 +955,7 @@ int main() {
                     char essentialsString[8]; // 8 is because the size of written essentialsString is 8 (including '\0')
                     int fA, pA, oA; // Use int to read values for bool with sscanf to avoid compile warnings
                     int i;
-                    sscanf(buff + 5, "%d %d %d %d %s %d %d %d %d %d",
+                    sscanf(buff + 5, "%d %d %d %d %s %d %d %d %d %d", // buff + 5 is to skip "done "
                         &newBooking->startTime, &newBooking->endTime, &newBooking->member,
                         &newBooking->priority, essentialsString, &fA, &pA, &oA, &newBooking->bookingID, &newBooking->num);
                     if (newBooking->num != 0) { // If there exists overwrittenIDs
@@ -1001,7 +1005,7 @@ int main() {
                     printf("Essentials:\n");
                     for (i = 0; i < 6; i++) {
                         if (newBooking->essentials[i]) {
-                            printf("%s\n", essentialsName[i]);
+                            printf("\t%s\n", essentialsName[i]);
                         }
                     }
                     printf("fAccepted: %s\n", newBooking->fAccepted ? "True" : "False");
