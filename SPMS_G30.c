@@ -444,35 +444,6 @@ char *convertEssentialsToString(bool *essentials) {
     return essentialsString;
 }
 
-char *convertAcceptedToString(bool fAccepted, bool pAccepted, bool oAccepted) {
-    char *acceptedString = malloc(4); // 3 char and 1 '\0'
-
-    if (fAccepted) {
-        acceptedString[0] = '1';
-    }
-    else {
-        acceptedString[0] = '0';
-    }
-
-    if (pAccepted) {
-        acceptedString[1] = '1';
-    }
-    else {
-        acceptedString[1] = '0';
-    }
-
-    if (oAccepted) {
-        acceptedString[2] = '1';
-    }
-    else {
-        acceptedString[2] = '0';
-    }
-
-    acceptedString[3] = '\0';
-
-    return acceptedString;
-}
-
 void CreateBookingFromCommand(int fd) 
 {  
     bookingInfo *newBooking = handleCreateBooking();  
@@ -481,15 +452,13 @@ void CreateBookingFromCommand(int fd)
 
         // Convert bool array to string for writing to parent
         char *essentialsString = convertEssentialsToString(newBooking->essentials);
-        char *acceptedString = convertAcceptedToString(newBooking->fAccepted, newBooking->pAccepted, newBooking->oAccepted);
 
-        sprintf(buff, "done %d %d %d %d %s %s",
+        sprintf(buff, "done %d %d %d %d %s %d %d %d",
                 newBooking->startTime, newBooking->endTime, newBooking->member,
-                newBooking->priority, essentialsString, acceptedString); 
+                newBooking->priority, essentialsString, newBooking->fAccepted, newBooking->pAccepted, newBooking->oAccepted); 
         write(fd, buff, sizeof(buff)); // Send booking info to parent
 
         free(essentialsString);
-        free(acceptedString);
 
         insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation 
         // free(newBooking); // Free the booking CAUSES BUG WHERE OLD BOOKING FORGOTTEN BY INSERTINTOBOOKINGS
@@ -874,10 +843,10 @@ int main() {
                 } else if (strncmp(buff, "done", 4) == 0) {
                     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
                     char essentialsString[8]; // 8 is because the size of written essentialsString is 8 (including '\0')
-                    char acceptedString[4]; // 4 is because the size of written acceptedString is 4 (including '\0')
-                    sscanf(buff + 5, "%d %d %d %d %s %s",
+                    int fA, pA, oA; // Use int to read values for bool with sscanf to avoid compile warnings
+                    sscanf(buff + 5, "%d %d %d %d %s %d %d %d",
                         &newBooking->startTime, &newBooking->endTime, &newBooking->member,
-                        &newBooking->priority, essentialsString, acceptedString);
+                        &newBooking->priority, essentialsString, &fA, &pA, &oA);
                     newBooking->next = NULL;
                     int i;
                     for (i = 0; i < 7; i++) { // 7 is because we only need the first 7 char of essentialsString (excluding '\0')
@@ -889,26 +858,10 @@ int main() {
                         }
                     }
 
-                    if (acceptedString[0] == '1') {
-                        newBooking->fAccepted = true;
-                    }
-                    else {
-                        newBooking->fAccepted = false;
-                    }
-
-                    if (acceptedString[1] == '1') {
-                        newBooking->pAccepted = true;
-                    }
-                    else {
-                        newBooking->pAccepted = false;
-                    }
-
-                    if (acceptedString[2] == '1') {
-                        newBooking->oAccepted = true;
-                    }
-                    else {
-                        newBooking->oAccepted = false;
-                    }
+                    // Convert int to bool and store them in the newBooking
+                    newBooking->fAccepted = (fA != 0);
+                    newBooking->pAccepted = (pA != 0);
+                    newBooking->oAccepted = (oA != 0);
 
                     insertIntoBookings(&head, newBooking);
 
