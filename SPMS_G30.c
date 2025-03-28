@@ -221,11 +221,11 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int
     int tempCount = 0;
 
     // scan entire booking list and save (into temp) bookings that are overlapping AND has targeted essential AND more priority
-    while (cur != NULL) {// because linked list is sorted by time, performant
+    while (cur != NULL && cur->startTime < targetBooking->endTime) {// because linked list is sorted by time, performant
         if (cur->essentials[target] && 
             ((mode == 1 && cur->pAccepted && isMorePriorityThan(cur, targetBooking, true)) ||
             (mode == 2  && cur->fAccepted) ||
-            (mode == 3  && cur->pAccepted)) && 
+            (mode == 3  && cur->oAccepted)) && 
             ((targetBooking->startTime >= cur->startTime && targetBooking->startTime < cur->endTime) || 
             (targetBooking->endTime > cur->startTime && targetBooking->endTime <= cur->endTime) ||
             (targetBooking->startTime <= cur->startTime && targetBooking->endTime >= cur->endTime))) {
@@ -349,7 +349,8 @@ bool isAvailableFCFS(bookingInfo *targetBooking)
     }
 
     return true; // Time slot is available
-} 
+}
+
 bool isAvailablePR(bookingInfo *targetBooking) 
 {
     if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 1)) {
@@ -363,6 +364,22 @@ bool isAvailablePR(bookingInfo *targetBooking)
         }
     }
     EvictEssential(targetBooking);
+    return true; // Time slot is available
+}
+
+bool isAvailableOPT(bookingInfo *targetBooking) 
+{ 
+    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 3)) {  
+        return false; // parking is overbooked
+    }
+
+    int i; //iterate through 6 essentials 
+    for (i = 0; i < 6; i++) {
+        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, 3)) {
+            return false; // Essential item is overbooked
+        }
+    }
+
     return true; // Time slot is available
 }
 
@@ -705,8 +722,8 @@ void reschedule()
     // Step 2: Reschedule the rejected bookings of priority to the nearest available time slot
     while (cur != NULL) {
         if (!cur->oAccepted) {
-            // Use FCFS to check if the current time slot requested by this rejected booking is available
-            while (!isAvailableFCFS(cur)) {
+            // Check if the current time slot requested by this rejected booking is available
+            while (!isAvailableOPT(cur)) {
                 // Add one hour for both startTime and endTime to check if the next hour is available
                 cur->startTime = addDurationToTime(cur->startTime, 1);
                 cur->endTime = addDurationToTime(cur->endTime, 1);
@@ -926,7 +943,7 @@ int main() {
                 else if (strcmp(COMMAND[1], "-ALL") == 0) {
                     write(fd[1], "AL", 3);  
                 } else {
-                    printf("invalid command");
+                    printf("invalid command\n");
                 }
             } else if (
             strcmp(COMMAND[0], "addEvent") == 0 ||
@@ -1009,8 +1026,8 @@ int main() {
                         }
                     }
                     printf("fAccepted: %s\n", newBooking->fAccepted ? "True" : "False");
-                    printf("pAccepted: %s\n", newBooking->pAccepted ? "True" : "False"); 
-                    printf("oAccepted: %s\n", newBooking->oAccepted ? "True" : "False"); 
+                    printf("pAccepted: %s\n", newBooking->pAccepted ? "True" : "False");
+                    printf("oAccepted: %s\n", newBooking->oAccepted ? "True" : "False");
                     
                 } else if (strncmp(buff, "FC", 3) == 0) {
                     printFCFS();
