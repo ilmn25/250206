@@ -20,6 +20,9 @@ typedef struct bookingInfo {
     bool fAccepted; // Accepted or not (First Come First Served)
     bool pAccepted; // Accepted or not (Priority)
     bool oAccepted; // Accepted or not (Optimized)
+    int bookingID; // Booking ID for cancellation search
+    int *overwrittenIDs; // The booking IDs that are overwritten by this booking
+    int num; // The number of overwrittenIDs
     struct bookingInfo *next;
 } bookingInfo;
 
@@ -52,6 +55,31 @@ void printOPT();
 void handlePrintBooking(int member, bool isAccepted, int acceptedType);
 void addBatch(const char *filename, int fd); 
 
+// Function to free the linked list (Only used when endProgram)
+void freeBookings(bookingInfo *head) {
+    bookingInfo *temp;
+    while (head != NULL) {
+        temp = head;
+        head = head->next;
+        if (temp->overwrittenIDs != NULL) {
+            free(temp->overwrittenIDs);
+        }
+        free(temp);
+    }
+}
+
+// Function to count bookings in the linked list (For calculate the bookingID)
+int countBookings(bookingInfo *head)
+{
+    int count = 0;
+    bookingInfo *cur = head;
+    while (cur != NULL) {
+        count++;
+        cur = cur->next;
+    }
+    return count;
+}
+
 // Function to insert a booking into the sorted linked list
 void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking) 
 {
@@ -82,6 +110,8 @@ void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking)
         }
         newBooking->next = NULL;
     }
+
+    newBooking->bookingID = countBookings(*head); // Update the bookingID after insertion
 }
 
 // return 3 for 000111, 2 for 010100, etc
@@ -258,6 +288,7 @@ void EvictEssential(bookingInfo *targetBooking)
             printf("BOOM %d\n", tempCount);
 
     int j;
+    int num = 0;
     // CHECK IF CORRECTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
     // 2- Go through the list and cancel the booking with least priority, and repeat until no overbooking
     for (i = 0; i < 7; ++i) {
@@ -273,6 +304,7 @@ void EvictEssential(bookingInfo *targetBooking)
 
             // Remove it from temp and set its pAccepted flag to false
             temp[target]->pAccepted = false;
+            targetBooking->overwrittenIDs[num++] = temp[target]->bookingID;
             // printf("NUKED %d\n", temp[target]->priority);
             // IT NEEDS TO SET P ACCEPTED TO FALSE IN MAIN PROCESS NOT HERE!!! 
             // 🔰🚸☣❇☢🚸🚸⚠☣🚸🔰🔰🚸🚸🚸⚠⚠⚠⚠
@@ -280,6 +312,7 @@ void EvictEssential(bookingInfo *targetBooking)
             temp[target] = NULL;  
         }
     }
+    targetBooking->num = num; // Update the number of overwrittenIDs
 }
 
 bool isAvailableFCFS(bookingInfo *targetBooking) 
@@ -407,7 +440,8 @@ bookingInfo *handleCreateBooking()
         printf("Invalid command\n");
         free(newBooking);
         return NULL;
-    } 
+    }
+
     newBooking->fAccepted = isAvailableFCFS(newBooking); 
     newBooking->pAccepted = isAvailablePR(newBooking); 
     newBooking->oAccepted = false;   
@@ -453,9 +487,13 @@ void CreateBookingFromCommand(int fd)
         // Convert bool array to string for writing to parent
         char *essentialsString = convertEssentialsToString(newBooking->essentials);
 
-        sprintf(buff, "done %d %d %d %d %s %d %d %d",
+        sprintf(buff, "done %d %d %d %d %s %d %d %d %d %d",
                 newBooking->startTime, newBooking->endTime, newBooking->member,
-                newBooking->priority, essentialsString, newBooking->fAccepted, newBooking->pAccepted, newBooking->oAccepted); 
+                newBooking->priority, essentialsString, newBooking->fAccepted, newBooking->pAccepted, newBooking->oAccepted, newBooking->bookingID, newBooking->num);
+        // Appending each item in overwrittenIDs to buff
+        for (int i = 0; i < newBooking->num; i++) {
+            sprintf(buff + strlen(buff), "%d ", newBooking->overwrittenIDs[i]);
+        }
         write(fd, buff, sizeof(buff)); // Send booking info to parent
 
         free(essentialsString);
@@ -488,6 +526,7 @@ void addBatch(const char *filename, int fd)
     }
 
     fclose(file);
+    freeBookings(head); // Free bookings for child
 }
 
 int rejectedCount(int member, int acceptedType)
@@ -773,6 +812,20 @@ void printReport()
     printf("\nThe report has been written to the file successfully\n");
 }
 
+void cancelBookings(bookingInfo *head, bookingInfo *newBooking)
+{
+    int num;
+    bookingInfo *cur = head;
+    while (cur != NULL) {
+        for (num = 0; num < newBooking->num; num++) {
+            if (cur->bookingID == newBooking->overwrittenIDs[num] && cur->pAccepted) {
+                cur->pAccepted = false;
+            }
+        }
+        cur = cur->next;
+    }
+}
+
 int main() {
     printf("~~ WELCOME TO PolyU ~~\n");
     while (true) { 
@@ -802,7 +855,7 @@ int main() {
             // Write
             if (strcmp(COMMAND[0], "endProgram") == 0) {
                 write(fd[1], "end", 3); // Tell parent to end the program
-            }  else if (strcmp(COMMAND[0], "addBatch") == 0) { 
+            } else if (strcmp(COMMAND[0], "addBatch") == 0) { 
                 addBatch(COMMAND[1], fd[1]); 
             } else if (strcmp(COMMAND[0], "printBookings") == 0) { // Tell parent to print bookings
                 if (strcmp(COMMAND[1], "-fcfs") == 0) {
@@ -825,6 +878,7 @@ int main() {
             strcmp(COMMAND[0], "addParking") == 0 ||
             strcmp(COMMAND[0], "bookEssentials") == 0 ) {  
                 CreateBookingFromCommand(fd[1]);
+                freeBookings(head); // Free bookings for child
             } else {
                 printf("invalid command, must be one of the following:\n");
                 printf("endProgram, addBatch, printBookings, addEvent, addParking, addParking, bookEssentials\n");
@@ -844,11 +898,27 @@ int main() {
                     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
                     char essentialsString[8]; // 8 is because the size of written essentialsString is 8 (including '\0')
                     int fA, pA, oA; // Use int to read values for bool with sscanf to avoid compile warnings
-                    sscanf(buff + 5, "%d %d %d %d %s %d %d %d",
-                        &newBooking->startTime, &newBooking->endTime, &newBooking->member,
-                        &newBooking->priority, essentialsString, &fA, &pA, &oA);
-                    newBooking->next = NULL;
                     int i;
+                    sscanf(buff + 5, "%d %d %d %d %s %d %d %d %d %d",
+                        &newBooking->startTime, &newBooking->endTime, &newBooking->member,
+                        &newBooking->priority, essentialsString, &fA, &pA, &oA, &newBooking->bookingID, &newBooking->num);
+                    if (newBooking->num != 0) { // If there exists overwrittenIDs
+                        newBooking->overwrittenIDs = malloc(newBooking->num * sizeof(int)); // Allocate memory for overwrittenIDs
+                        char *token = strtok(buff, " "); // Split the buff by " "
+                        for (i = 0; i < 10; i++) { // Skip the first 10 tokens
+                            token = strtok(NULL, " ");
+                        }
+    
+                        for (i = 0; i < newBooking->num; i++) {
+                            token = strtok(NULL, " "); // Continue to get the remaining tokens
+                            if (token != NULL) {
+                                newBooking->overwrittenIDs[i] = atoi(token); // Convert the string to int and store in overwrittenIDs
+                            }
+                        }
+                    }
+
+                    newBooking->next = NULL;
+
                     for (i = 0; i < 7; i++) { // 7 is because we only need the first 7 char of essentialsString (excluding '\0')
                         if (essentialsString[i] == '1') {
                             newBooking->essentials[i] = true;
@@ -864,6 +934,10 @@ int main() {
                     newBooking->oAccepted = (oA != 0);
 
                     insertIntoBookings(&head, newBooking);
+
+                    if (newBooking->num != 0) {
+                        cancelBookings(head, newBooking);
+                    }
 
                     // DEBUG
                     printf("--------------------------\n");
@@ -909,6 +983,7 @@ int main() {
     }
     
     printf("Bye!\n");
+    freeBookings(head);
     return 0;
 }
 
