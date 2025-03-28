@@ -686,7 +686,7 @@ void printPR()
     printf("\n===========================================================================\n");
 }
 
-// Function to reschedule the rejected bookings of priority
+// Function for optimized algorithm to reschedule the rejected bookings of priority
 void reschedule(bookingInfo *head)
 {
     bookingInfo *cur = head;
@@ -717,7 +717,7 @@ void reschedule(bookingInfo *head)
 
 void printOPT()  
 {
-    reschedule(head);
+    reschedule(head); // Reschedule the rejected bookings of priority
     int member; 
     printf("*** Parking Booking - ACCEPTED / OPTIMIZED ***\n");
     for (member = 1; member <= 5; member++) { 
