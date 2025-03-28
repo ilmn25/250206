@@ -221,11 +221,12 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int
     int tempCount = 0;
 
     // scan entire booking list and save (into temp) bookings that are overlapping AND has targeted essential AND more priority
-    while (cur != NULL && cur->startTime < targetBooking->endTime) {// because linked list is sorted by time, performant
+    while (cur != NULL) {// because linked list is sorted by time, performant
         if (cur->essentials[target] && 
             ((mode == 1 && cur->pAccepted && isMorePriorityThan(cur, targetBooking, true)) ||
             (mode == 2  && cur->fAccepted) ||
-            (mode == 3  && cur->oAccepted)) && 
+            (mode == 3  && cur->pAccepted) ||
+            (mode == 4  && cur->oAccepted)) && 
             ((targetBooking->startTime >= cur->startTime && targetBooking->startTime < cur->endTime) || 
             (targetBooking->endTime > cur->startTime && targetBooking->endTime <= cur->endTime) ||
             (targetBooking->startTime <= cur->startTime && targetBooking->endTime >= cur->endTime))) {
@@ -369,13 +370,13 @@ bool isAvailablePR(bookingInfo *targetBooking)
 
 bool isAvailableOPT(bookingInfo *targetBooking) 
 { 
-    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 3)) {  
+    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 4)) {  
         return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, 3)) {
+        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, 4)) {
             return false; // Essential item is overbooked
         }
     }
@@ -887,7 +888,8 @@ void cancelBookings(bookingInfo *newBooking)
 {
     int num;
     bookingInfo *cur = head;
-    printf("\nThere is %d booking needs to be cancelled. BOOKINGID: %d\n", newBooking->num, newBooking->overwrittenIDs[0]);
+    printf("\nThere is %d booking needs to be cancelled. BookingID: ", newBooking->num);
+    for (num = 0; num < newBooking->num; num++) printf("%d ", newBooking->overwrittenIDs[num]);
     while (cur != NULL) {
         for (num = 0; num < newBooking->num; num++) {
             if (cur->bookingID == newBooking->overwrittenIDs[num] && cur->pAccepted) {
