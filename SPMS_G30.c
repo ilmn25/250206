@@ -288,7 +288,8 @@ void EvictEssential(bookingInfo *targetBooking)
             printf("BOOM %d\n", tempCount);
 
     int j;
-    int num = 0;
+    targetBooking->num = 0;
+    targetBooking->overwrittenIDs = NULL; // Initialize the pointer of overwrittenIDs to NULL
     // CHECK IF CORRECTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
     // 2- Go through the list and cancel the booking with least priority, and repeat until no overbooking
     for (i = 0; i < 7; ++i) {
@@ -304,7 +305,29 @@ void EvictEssential(bookingInfo *targetBooking)
 
             // Remove it from temp and set its pAccepted flag to false
             temp[target]->pAccepted = false;
-            targetBooking->overwrittenIDs[num++] = temp[target]->bookingID;
+            
+            int newSize = targetBooking->num + 1;
+            int *newMemory;
+
+            if (targetBooking->overwrittenIDs == NULL) {
+                // Memory allocation for the first time
+                newMemory = malloc(sizeof(int));
+                if (newMemory == NULL) {
+                    fprintf(stderr, "Memory allocation failed for overwrittenIDs.\n");
+                    return;
+                }
+            } else {
+                // Reallocation for newSize
+                newMemory = realloc(targetBooking->overwrittenIDs, newSize * sizeof(int));
+                if (newMemory == NULL) {
+                    fprintf(stderr, "Memory reallocation failed for overwrittenIDs.\n");
+                    free(targetBooking->overwrittenIDs); // Free the original memory allocation
+                    return;
+                }
+            }
+
+            targetBooking->overwrittenIDs = newMemory; // Update the pointer
+            targetBooking->overwrittenIDs[targetBooking->num++] = temp[target]->bookingID;
             // printf("NUKED %d\n", temp[target]->priority);
             // IT NEEDS TO SET P ACCEPTED TO FALSE IN MAIN PROCESS NOT HERE!!! 
             // 🔰🚸☣❇☢🚸🚸⚠☣🚸🔰🔰🚸🚸🚸⚠⚠⚠⚠
@@ -312,7 +335,6 @@ void EvictEssential(bookingInfo *targetBooking)
             temp[target] = NULL;  
         }
     }
-    targetBooking->num = num; // Update the number of overwrittenIDs
 }
 
 bool isAvailableFCFS(bookingInfo *targetBooking) 
