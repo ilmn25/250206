@@ -305,7 +305,7 @@ void EvictEssential(bookingInfo *targetBooking)
 
             // Remove it from temp and set its pAccepted flag to false
             temp[target]->pAccepted = false;
-            
+
             int newSize = targetBooking->num + 1;
             int *newMemory;
 
@@ -686,8 +686,38 @@ void printPR()
     printf("\n===========================================================================\n");
 }
 
+// Function to reschedule the rejected bookings of priority
+void reschedule(bookingInfo *head)
+{
+    bookingInfo *cur = head;
+
+    // Step 1: Copy the priority result to optimized
+    while (cur != NULL) {
+        if (cur->pAccepted) {
+            cur->oAccepted = true;
+        }
+        cur = cur->next;
+    }
+
+    cur = head; // Reset cur to head
+    // Step 2: Reschedule the rejected bookings of priority to the nearest available time slot
+    while (cur != NULL) {
+        if (!cur->oAccepted) {
+            // Use FCFS to check if the current time slot requested by this rejected booking is available
+            while (!isAvailableFCFS(cur)) {
+                // Add one hour for both startTime and endTime to check if the next hour is available
+                cur->startTime = addDurationToTime(cur->startTime, 1);
+                cur->endTime = addDurationToTime(cur->endTime, 1);
+            }
+            cur->oAccepted = true;
+        }
+        cur = cur->next;
+    }
+}
+
 void printOPT()  
 {
+    reschedule(head);
     int member; 
     printf("*** Parking Booking - ACCEPTED / OPTIMIZED ***\n");
     for (member = 1; member <= 5; member++) { 
@@ -976,7 +1006,7 @@ int main() {
                     }
                     printf("fAccepted: %s\n", newBooking->fAccepted ? "True" : "False");
                     printf("pAccepted: %s\n", newBooking->pAccepted ? "True" : "False"); 
-                    // printf("oAccepted: %d\n", newBooking->oAccepted); 
+                    printf("oAccepted: %s\n", newBooking->oAccepted ? "True" : "False"); 
                     
                 } else if (strncmp(buff, "FC", 3) == 0) {
                     printFCFS();
