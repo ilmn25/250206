@@ -56,7 +56,7 @@ void handlePrintBooking(int member, bool isAccepted, int acceptedType);
 void addBatch(const char *filename, int fd); 
 
 // Function to free the linked list (Only used when endProgram)
-void freeBookings(bookingInfo *head) {
+void freeBookings() {
     bookingInfo *temp;
     while (head != NULL) {
         temp = head;
@@ -69,7 +69,7 @@ void freeBookings(bookingInfo *head) {
 }
 
 // Function to count bookings in the linked list (For calculate the bookingID)
-int countBookings(bookingInfo *head)
+int countBookings()
 {
     int count = 0;
     bookingInfo *cur = head;
@@ -111,7 +111,7 @@ void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking)
         newBooking->next = NULL;
     }
 
-    newBooking->bookingID = countBookings(*head); // Update the bookingID after insertion
+    newBooking->bookingID = countBookings(); // Update the bookingID after insertion
 }
 
 // return 3 for 000111, 2 for 010100, etc
@@ -548,7 +548,7 @@ void addBatch(const char *filename, int fd)
     }
 
     fclose(file);
-    freeBookings(head); // Free bookings for child
+    freeBookings(); // Free bookings for child
 }
 
 int rejectedCount(int member, int acceptedType)
@@ -687,7 +687,7 @@ void printPR()
 }
 
 // Function for optimized algorithm to reschedule the rejected bookings of priority
-void reschedule(bookingInfo *head)
+void reschedule()
 {
     bookingInfo *cur = head;
 
@@ -717,7 +717,7 @@ void reschedule(bookingInfo *head)
 
 void printOPT()  
 {
-    reschedule(head); // Reschedule the rejected bookings of priority
+    reschedule(); // Reschedule the rejected bookings of priority
     int member; 
     printf("*** Parking Booking - ACCEPTED / OPTIMIZED ***\n");
     for (member = 1; member <= 5; member++) { 
@@ -864,7 +864,7 @@ void printReport()
     printf("\nThe report has been written to the file successfully\n");
 }
 
-void cancelBookings(bookingInfo *head, bookingInfo *newBooking)
+void cancelBookings(bookingInfo *newBooking)
 {
     int num;
     bookingInfo *cur = head;
@@ -930,7 +930,7 @@ int main() {
             strcmp(COMMAND[0], "addParking") == 0 ||
             strcmp(COMMAND[0], "bookEssentials") == 0 ) {  
                 CreateBookingFromCommand(fd[1]);
-                freeBookings(head); // Free bookings for child
+                freeBookings(); // Free bookings for child
             } else {
                 printf("invalid command, must be one of the following:\n");
                 printf("endProgram, addBatch, printBookings, addEvent, addParking, addParking, bookEssentials\n");
@@ -988,7 +988,7 @@ int main() {
                     insertIntoBookings(&head, newBooking);
 
                     if (newBooking->num != 0) {
-                        cancelBookings(head, newBooking);
+                        cancelBookings(newBooking);
                     }
 
                     // DEBUG
@@ -1035,7 +1035,7 @@ int main() {
     }
     
     printf("Bye!\n");
-    freeBookings(head);
+    freeBookings();
     return 0;
 }
 
