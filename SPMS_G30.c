@@ -23,6 +23,8 @@ typedef struct bookingInfo {
     int bookingID; // Booking ID for cancellation search
     int *overwrittenIDs; // The booking IDs that are overwritten by this booking
     int num; // The number of overwrittenIDs
+    int reStartTime; // YYYYMMDDHH the start time after rescheduling
+    int reEndTime; // YYYYMMDDHH the start time after rescheduling
     struct bookingInfo *next;
 } bookingInfo;
 
@@ -225,8 +227,7 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int
         if (cur->essentials[target] && 
             ((mode == 1 && cur->pAccepted && isMorePriorityThan(cur, targetBooking, true)) ||
             (mode == 2  && cur->fAccepted) ||
-            (mode == 3  && cur->pAccepted) ||
-            (mode == 4  && cur->oAccepted)) && 
+            (mode == 3  && cur->pAccepted)) && 
             ((targetBooking->startTime >= cur->startTime && targetBooking->startTime < cur->endTime) || 
             (targetBooking->endTime > cur->startTime && targetBooking->endTime <= cur->endTime) ||
             (targetBooking->startTime <= cur->startTime && targetBooking->endTime >= cur->endTime))) {
@@ -254,6 +255,66 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int
 
     return true; // available
 }
+
+// Function which is the same as isAvailableEssential but for optimized since optimized needs to handle reschedule time
+bool isAvailableEssentialOPT(bookingInfo *targetBooking, int target, int limit) 
+{ 
+    bookingInfo *cur = head;
+    bookingInfo *temp[100];
+    int tempCount = 0;
+
+    // For compare when the current booking is also using reschedule time
+    int curSt;
+    int curEt;
+
+    // scan entire booking list and save (into temp) bookings that are overlapping AND has targeted essential AND more priority
+    while (cur != NULL) {// because linked list is sorted by time, performant
+        if (cur->essentials[target] && cur->oAccepted) { // oAccepted has two case: 1 is original accepted by priority, 2 is accepted after reschedule
+            // Set the value of curSt and curEt
+            if (cur->reStartTime != -1 && cur->reEndTime != -1) {
+                curSt = cur->reStartTime;
+                curEt = cur->reEndTime;
+            }
+            else {
+                curSt = cur->startTime;
+                curEt = cur->endTime;
+            }
+            if ((targetBooking->reStartTime >= curSt && targetBooking->reStartTime < curEt) || 
+            (targetBooking->reEndTime > curSt && targetBooking->reEndTime <= curEt) ||
+            (targetBooking->reStartTime <= curSt && targetBooking->reEndTime >= curEt)) {
+                // Add cur to temp list
+                temp[tempCount++] = cur;  
+            }
+        }
+        cur = cur->next;
+    }
+
+    // i - iterate through each hour in target time period
+    // j - iterate through each overlapping temp to see if more than [limit] overlaps (3 for essentials or 10 for parking)
+    int i, j;
+    int currentHour = targetBooking->reStartTime;
+    while (currentHour <= targetBooking->reEndTime) { //go through each hour until reach endtime 
+        int count = 0;
+        for (j = 0; j < tempCount; j++) {
+            if (temp[j]->reStartTime != -1 && temp[j]->reEndTime != -1) {
+                curSt = temp[j]->reStartTime;
+                curEt = temp[j]->reEndTime;
+            }
+            else {
+                curSt = temp[j]->startTime;
+                curEt = temp[j]->endTime;
+            }
+            if (currentHour >= curSt && currentHour < curEt) {
+                count++;  
+                if (count >= limit) return false; // Overbooked
+            }
+        }
+        currentHour = addDurationToTime(currentHour, 1);  
+    }
+
+    return true; // available
+}
+
 bool isOverlapEssentials(bookingInfo* bookingA, bookingInfo* bookingB) {
     int i;
     for (i = 0; i < 7; ++i) {
@@ -370,13 +431,13 @@ bool isAvailablePR(bookingInfo *targetBooking)
 
 bool isAvailableOPT(bookingInfo *targetBooking) 
 { 
-    if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 4)) {  
+    if (targetBooking->essentials[6] && !isAvailableEssentialOPT(targetBooking, 6, 10)) {  
         return false; // parking is overbooked
     }
 
     int i; //iterate through 6 essentials 
     for (i = 0; i < 6; i++) {
-        if (targetBooking->essentials[i] && !isAvailableEssential(targetBooking, i, 3, 4)) {
+        if (targetBooking->essentials[i] && !isAvailableEssentialOPT(targetBooking, i, 3)) {
             return false; // Essential item is overbooked
         }
     }
@@ -484,7 +545,7 @@ bookingInfo *handleCreateBooking()
     newBooking->overwrittenIDs = NULL; // Initialize the pointer of overwrittenIDs to NULL
     newBooking->fAccepted = isAvailableFCFS(newBooking); 
     newBooking->pAccepted = isAvailablePR(newBooking); 
-    newBooking->oAccepted = false;   
+    newBooking->oAccepted = false; // Initialize the oAccepted to false
     newBooking->next = NULL;
     return newBooking;
 }
@@ -598,10 +659,108 @@ int rejectedCount(int member, int acceptedType)
     return count;
 }
 
+// Function for merge sort
+bookingInfo *merge(bookingInfo *left, bookingInfo *right, bool forReschedule)
+{
+    bookingInfo *result = NULL;
+
+    if (left == NULL) return right;
+    if (right == NULL) return left;
+
+    int leftSt;
+    int leftEt;
+    int rightSt;
+    int rightEt;
+
+    if (forReschedule) {
+        if (left->reStartTime != -1 && left->reEndTime != -1) {
+            leftSt = left->reStartTime;
+            leftEt = left->reEndTime;
+        }
+        else {
+            leftSt = left->startTime;
+            leftEt = left->endTime;
+        }
+        if (right->reStartTime != -1 && right->reEndTime != -1) {
+            rightSt = right->reStartTime;
+            rightEt = right->reEndTime;
+        }
+        else {
+            rightSt = right->startTime;
+            rightEt = right->endTime;
+        }
+    }
+    else {
+        leftSt = left->startTime;
+        leftEt = left->endTime;
+        rightSt = right->startTime;
+        rightEt = right->endTime;
+    }
+
+    if (leftSt <= rightSt) {
+        result = left;
+        result->next = merge(left->next, right, forReschedule);
+    } else {
+        result = right;
+        result->next = merge(left, right->next, forReschedule);
+    }
+
+    return result;
+}
+
+// Function for merge sort to split the linked list in half
+void split(bookingInfo *source, bookingInfo **front, bookingInfo **back) {
+    bookingInfo *fast;
+    bookingInfo *slow;
+    slow = source;
+    fast = source->next;
+
+    while (fast != NULL) {
+        fast = fast->next;
+        if (fast != NULL) {
+            slow = slow->next;
+            fast = fast->next;
+        }
+    }
+
+    *front = source;
+    *back = slow->next;
+    slow->next = NULL;
+}
+
+// Merge sort function
+void mergeSort(bookingInfo **headRef, bool forReschedule) {
+    bookingInfo *h = *headRef;
+    bookingInfo *a;
+    bookingInfo *b;
+
+    if (h == NULL || h->next == NULL) {
+        return;
+    }
+
+    split(h, &a, &b);
+
+    mergeSort(&a, forReschedule);
+    mergeSort(&b, forReschedule);
+
+    *headRef = merge(a, b, forReschedule);
+}
+
 void handlePrintBooking(int member, bool isAccepted, int acceptedType) 
 {
     bookingInfo *cur = head;
     bool accepted;
+
+    int curSt;
+    int curEt;
+
+    if (acceptedType == 3) {
+        mergeSort(&head, true); // Sort the linked list including reStartTime
+    }
+    else {
+        mergeSort(&head, false); // Sort the linked list by startTime only
+    }
+
     if (isAccepted) {
         printf("\nMember_%c has the following bookings:\n", 'A' + member - 1);
         printf("\nDate\t\tStart\tEnd\tType\t\tDevice");
@@ -615,21 +774,33 @@ void handlePrintBooking(int member, bool isAccepted, int acceptedType)
         switch (acceptedType) {
             case 1:
                 accepted = cur->fAccepted;
+                curSt = cur->startTime;
+                curEt = cur->endTime;
                 break;
             case 2:
                 accepted = cur->pAccepted;
+                curSt = cur->startTime;
+                curEt = cur->endTime;
                 break;
             case 3:
                 accepted = cur->oAccepted;
+                if (cur->reStartTime != -1 && cur->reEndTime != -1) {
+                    curSt = cur->reStartTime;
+                    curEt = cur->reEndTime;
+                }
+                else {
+                    curSt = cur->startTime;
+                    curEt = cur->endTime;
+                }
                 break;
         }
 
         if (cur->member == member && accepted == isAccepted) {
-            int year = cur->startTime / 1000000;
-            int month = (cur->startTime / 10000) % 100;
-            int day = (cur->startTime / 100) % 100;
-            int startHour = cur->startTime % 100;
-            int endHour = cur->endTime % 100;
+            int year = curSt / 1000000;
+            int month = (curSt / 10000) % 100;
+            int day = (curSt / 100) % 100;
+            int startHour = curSt % 100;
+            int endHour = curEt % 100;
 
             bool noEssential = true;
             int i;
@@ -715,6 +886,8 @@ void reschedule()
     while (cur != NULL) {
         if (cur->pAccepted) {
             cur->oAccepted = true;
+            cur->reStartTime = -1; // Initialize the reStartTime to -1
+            cur->reEndTime = -1; // Initialize the reEndTime to -1
         }
         cur = cur->next;
     }
@@ -723,11 +896,13 @@ void reschedule()
     // Step 2: Reschedule the rejected bookings of priority to the nearest available time slot
     while (cur != NULL) {
         if (!cur->oAccepted) {
+            cur->reStartTime = cur->startTime; // Initialize the reStartTime to the startTime
+            cur->reEndTime = cur->endTime; // Initialize the reEndTime to the endTime
             // Check if the current time slot requested by this rejected booking is available
             while (!isAvailableOPT(cur)) {
-                // Add one hour for both startTime and endTime to check if the next hour is available
-                cur->startTime = addDurationToTime(cur->startTime, 1);
-                cur->endTime = addDurationToTime(cur->endTime, 1);
+                // Add one hour for both reStartTime and reEndTime to check if the next hour is available
+                cur->reStartTime = addDurationToTime(cur->reStartTime, 1);
+                cur->reEndTime = addDurationToTime(cur->reEndTime, 1);
             }
             cur->oAccepted = true;
         }
