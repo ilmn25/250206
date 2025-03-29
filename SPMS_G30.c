@@ -347,7 +347,7 @@ void EvictEssential(bookingInfo *targetBooking)
         }
         cur = cur->next;
     } 
-            printf("BOOM %d\n", tempCount);
+            // printf("BOOM %d\n", tempCount);
 
     int j;
     // CHECK IF CORRECTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
@@ -479,6 +479,7 @@ bookingInfo *handleCreateBooking()
         return NULL;
     }
     newBooking->startTime = year * 1000000 + month * 10000 + day * 100 + hour;
+    newBooking->startTime = addDurationToTime(newBooking->startTime, 0); // this makes errors like 30:00 to become 6:00 in the next day
 
     // Store the duration
     newBooking->endTime = addDurationToTime(newBooking->startTime, atoi(COMMAND[4]));
@@ -581,6 +582,7 @@ char *convertEssentialsToString(bool *essentials) {
 
 void CreateBookingFromCommand(int fd) 
 {  
+    printf("-> [Pending]\n");
     bookingInfo *newBooking = handleCreateBooking();  
     if (newBooking != NULL) { 
         char buff[100]; // Declare a large enough buffer to write the booking information
@@ -588,6 +590,7 @@ void CreateBookingFromCommand(int fd)
         // Convert bool array to string for writing to parent
         char *essentialsString = convertEssentialsToString(newBooking->essentials);
 
+        printf("-> [Done!]\n");
         sprintf(buff, "done %d %d %d %d %s %d %d %d %d %d ",
                 newBooking->startTime, newBooking->endTime, newBooking->member,
                 newBooking->priority, essentialsString, (int)newBooking->fAccepted,
@@ -620,7 +623,7 @@ void addBatch(const char *filename, int fd)
     char line[100]; // Buffer to store each line of the file
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\n")] = '\0'; // Convert the newline character to null character
-
+        printf("----------------\n> %s\n", line);
         // Seperate the line into tokens and store them in COMMAND array
         setCommandFromString(line);
         // Process command
@@ -1058,13 +1061,13 @@ void cancelBookings(bookingInfo *newBooking)
 {
     int num;
     bookingInfo *cur = head;
-    printf("\nThere is %d booking needs to be cancelled. BookingID: ", newBooking->num);
-    for (num = 0; num < newBooking->num; num++) printf("%d ", newBooking->overwrittenIDs[num]);
+    // printf("\nThere is %d booking needs to be cancelled. BookingID: ", newBooking->num);
+    // for (num = 0; num < newBooking->num; num++) printf("%d ", newBooking->overwrittenIDs[num]);
     while (cur != NULL) {
         for (num = 0; num < newBooking->num; num++) {
             if (cur->bookingID == newBooking->overwrittenIDs[num] && cur->pAccepted) {
                 cur->pAccepted = false;
-                printf("\nBookingID: %d Cancelled\n", cur->bookingID);
+                // printf("\nBookingID: %d Cancelled\n", cur->bookingID);
             }
         }
         cur = cur->next;
@@ -1183,23 +1186,23 @@ int main() {
                     if (newBooking->num != 0) {
                         cancelBookings(newBooking);
                     }
-
+ 
                     // DEBUG
-                    printf("--------------------------\n");
-                    printf("New Booking:\n");
-                    printf("start: %d\n", newBooking->startTime);
-                    printf("end: %d\n", newBooking->endTime);
-                    printf("Member: %d\n", newBooking->member);
-                    printf("Priority: %d\n", newBooking->priority);
-                    printf("Essentials:\n");
-                    for (i = 0; i < 6; i++) {
-                        if (newBooking->essentials[i]) {
-                            printf("\t%s\n", essentialsName[i]);
-                        }
-                    }
-                    printf("fAccepted: %s\n", newBooking->fAccepted ? "True" : "False");
-                    printf("pAccepted: %s\n", newBooking->pAccepted ? "True" : "False");
-                    printf("oAccepted: %s\n", newBooking->oAccepted ? "True" : "False");
+                    // printf("--------------------------\n");
+                    // printf("New Booking:\n");
+                    // printf("start: %d\n", newBooking->startTime);
+                    // printf("end: %d\n", newBooking->endTime);
+                    // printf("Member: %d\n", newBooking->member);
+                    // printf("Priority: %d\n", newBooking->priority);
+                    // printf("Essentials:\n");
+                    // for (i = 0; i < 6; i++) {
+                    //     if (newBooking->essentials[i]) {
+                    //         printf("\t%s\n", essentialsName[i]);
+                    //     }
+                    // }
+                    // printf("fAccepted: %s\n", newBooking->fAccepted ? "True" : "False");
+                    // printf("pAccepted: %s\n", newBooking->pAccepted ? "True" : "False");
+                    // printf("oAccepted: %s\n", newBooking->oAccepted ? "True" : "False");
                     
                 } else if (strncmp(buff, "FC", 3) == 0) {
                     printFCFS();
