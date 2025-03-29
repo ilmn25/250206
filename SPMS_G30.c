@@ -607,6 +607,7 @@ void CreateBookingFromCommand(int fd)
         insertIntoBookings(&head, newBooking); // Update the current linked list of child for batch implementation 
         // free(newBooking); // Free the booking CAUSES BUG WHERE OLD BOOKING FORGOTTEN BY INSERTINTOBOOKINGS
     } else {
+        printf("Operation failed\n");
         write(fd, "fail", 4); // Tell parent that booking failed
     }
 }
@@ -1215,8 +1216,7 @@ int main() {
                     printPR();
                     printOPT();
                     printReport();
-                } else if (strncmp(buff, "fail", 4) == 0) {
-                    // printf("Operation failed\n");
+                } else if (strncmp(buff, "fail", 4) == 0) { 
                     invalidCount++;
                 } else if (strncmp(buff, "invalid", 7) == 0) {
                     invalidCount++;
