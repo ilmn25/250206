@@ -1216,7 +1216,7 @@ int main() {
                     printOPT();
                     printReport();
                 } else if (strncmp(buff, "fail", 4) == 0) {
-                    printf("Operation failed\n");
+                    // printf("Operation failed\n");
                     invalidCount++;
                 } else if (strncmp(buff, "invalid", 7) == 0) {
                     invalidCount++;
