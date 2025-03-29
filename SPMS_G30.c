@@ -881,6 +881,9 @@ void reschedule()
             cur->reStartTime = -1; // Initialize the reStartTime to -1
             cur->reEndTime = -1; // Initialize the reEndTime to -1
         }
+        else {
+            cur->oAccepted = false;
+        }
         cur = cur->next;
     }
 
