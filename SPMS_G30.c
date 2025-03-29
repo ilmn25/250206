@@ -668,33 +668,25 @@ bookingInfo *merge(bookingInfo *left, bookingInfo *right, bool forReschedule)
     if (right == NULL) return left;
 
     int leftSt;
-    int leftEt;
     int rightSt;
-    int rightEt;
 
     if (forReschedule) {
-        if (left->reStartTime != -1 && left->reEndTime != -1) {
+        if (left->reStartTime != -1) {
             leftSt = left->reStartTime;
-            leftEt = left->reEndTime;
         }
         else {
             leftSt = left->startTime;
-            leftEt = left->endTime;
         }
-        if (right->reStartTime != -1 && right->reEndTime != -1) {
+        if (right->reStartTime != -1) {
             rightSt = right->reStartTime;
-            rightEt = right->reEndTime;
         }
         else {
             rightSt = right->startTime;
-            rightEt = right->endTime;
         }
     }
     else {
         leftSt = left->startTime;
-        leftEt = left->endTime;
         rightSt = right->startTime;
-        rightEt = right->endTime;
     }
 
     if (leftSt <= rightSt) {
@@ -748,18 +740,18 @@ void mergeSort(bookingInfo **headRef, bool forReschedule) {
 
 void handlePrintBooking(int member, bool isAccepted, int acceptedType) 
 {
-    bookingInfo *cur = head;
-    bool accepted;
-
-    int curSt;
-    int curEt;
-
     if (acceptedType == 3) {
         mergeSort(&head, true); // Sort the linked list including reStartTime
     }
     else {
         mergeSort(&head, false); // Sort the linked list by startTime only
     }
+    
+    bookingInfo *cur = head;
+    bool accepted;
+
+    int curSt;
+    int curEt;
 
     if (isAccepted) {
         printf("\nMember_%c has the following bookings:\n", 'A' + member - 1);
