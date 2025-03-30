@@ -57,7 +57,6 @@ void printPR();
 void printOPT();
 void handlePrintBooking(int member, bool isAccepted, int acceptedType);
 void addBatch(const char *filename, int fd);
-void removeOverwrittenID(bookingInfo *targetBooking, int id);
 void tryRestore(bookingInfo *targetBooking);
 
 // Function to free the linked list (Only used when endProgram)
