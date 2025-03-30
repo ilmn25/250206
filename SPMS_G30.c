@@ -48,6 +48,7 @@ void EvictEssential(bookingInfo *targetBooking);
 bool isAvailableFCFS(bookingInfo *targetBooking);
 bool isAvailablePR(bookingInfo *targetBooking);
 bool isCorrectArgCount(int count);
+bool isCorrectArgCountForParking(int count1, int count2);
 bookingInfo *handleCreateBooking();
 void setCommandFromString(char input[]);
 void CreateBookingFromCommand(int fd);
@@ -55,7 +56,9 @@ void printFCFS();
 void printPR();
 void printOPT();
 void handlePrintBooking(int member, bool isAccepted, int acceptedType);
-void addBatch(const char *filename, int fd); 
+void addBatch(const char *filename, int fd);
+void removeOverwrittenID(bookingInfo *targetBooking, int id);
+void tryRestore(bookingInfo *targetBooking);
 
 // Function to free the linked list (Only used when endProgram)
 void freeBookings() {
@@ -324,6 +327,33 @@ bool isOverlapEssentials(bookingInfo* bookingA, bookingInfo* bookingB) {
     }
     return false;
 }
+
+// Function for priority algorithm to check if it is possible to restore unnecessary evicted bookings
+void tryRestore(bookingInfo *targetBooking)
+{
+    bookingInfo *cur = head;
+    int i;
+    bookingInfo *temp[100];
+    int count = 0;
+
+    // Step 1: Find the ids that are evicted
+    while (cur != NULL) {
+        for (i = 0; i < targetBooking->num; i++) {
+            if (cur->bookingID == targetBooking->overwrittenIDs[i]) {
+                temp[count++] = cur;
+            }
+        }
+        cur = cur->next;
+    }
+
+    // Step 2: Try to restore the evicted bookings if it is possible
+    for (i = 0; i < count; i++) {
+        if (isAvailablePR(temp[i])) {
+            temp[i]->pAccepted = true;
+        }
+    }
+}
+
 void EvictEssential(bookingInfo *targetBooking)  
 {
     int i; //iterate  
@@ -415,6 +445,7 @@ bool isAvailableFCFS(bookingInfo *targetBooking)
 
 bool isAvailablePR(bookingInfo *targetBooking) 
 {
+    printf("\nChecking isAvailable for booking ID: %d\n", targetBooking->bookingID);
     if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 1)) {
         return false; // parking is overbooked
     }
@@ -482,7 +513,14 @@ bookingInfo *handleCreateBooking()
     newBooking->startTime = addDurationToTime(newBooking->startTime, 0); // this makes errors like 30:00 to become 6:00 in the next day
 
     // Store the duration
-    newBooking->endTime = addDurationToTime(newBooking->startTime, atoi(COMMAND[4]));
+    int dur;
+    if (sscanf(COMMAND[4], "%d.0", &dur) != 1) { // Assuming duration is given in d.0 format
+        printf("Invalid duration format: expected d.0\n");
+        free(newBooking);
+        return NULL;
+    }
+    newBooking->endTime = addDurationToTime(newBooking->startTime, dur);
+
     int i;
     // Convert priority and essentials to integer
     for (i = 0; i < 7; i++) {
@@ -501,6 +539,10 @@ bookingInfo *handleCreateBooking()
             free(newBooking);
             return NULL;
         }
+        if (!isCorrectArgCount(8)) {
+            free(newBooking);
+            return NULL;
+        }
 
     } else if (strcmp(COMMAND[0], "addReservation") == 0) {
         newBooking->priority = 2;
@@ -510,6 +552,10 @@ bookingInfo *handleCreateBooking()
         handleSetEssentials(newBooking->essentials, COMMAND[6], true);
         if (getEssentialSum(newBooking->essentials) != 2) {
             printf("Invalid essentials format: need exactly 2 essentials which must belong in a pair\n");
+            free(newBooking);
+            return NULL;
+        }
+        if (!isCorrectArgCount(7)) {
             free(newBooking);
             return NULL;
         }
@@ -525,6 +571,10 @@ bookingInfo *handleCreateBooking()
             free(newBooking);
             return NULL;
         }
+        if (!isCorrectArgCountForParking(5, 7)) {
+            free(newBooking);
+            return NULL;
+        }
 
     } else if (strcmp(COMMAND[0], "bookEssentials") == 0) {
         newBooking->priority = 4;
@@ -532,6 +582,10 @@ bookingInfo *handleCreateBooking()
         handleSetEssentials(newBooking->essentials, COMMAND[5], false);
         if (getEssentialSum(newBooking->essentials) != 1) {
             printf("Invalid essentials format: need at exactly 1 valid essential only\n");
+            free(newBooking);
+            return NULL;
+        }
+        if (!isCorrectArgCount(6)) {
             free(newBooking);
             return NULL;
         }
@@ -566,6 +620,19 @@ void setCommandFromString(char input[])
         strcpy(COMMAND[i++], token);
         token = strtok(NULL, " ");
     }
+}
+
+bool checkLastCharOfCommand() {
+    int i;
+    for (i = 9; i >= 0; i--) { // Search from the end of the command
+        if (COMMAND[i][0] != '\0') {
+            if (COMMAND[i][strlen(COMMAND[i]) - 1] == ';') {
+                COMMAND[i][strlen(COMMAND[i]) - 1] = '\0'; // Reset the ';' to '\0' for further process
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 char *convertEssentialsToString(bool *essentials) {
@@ -627,6 +694,10 @@ void addBatch(const char *filename, int fd)
         printf("----------------\n> %s\n", line);
         // Seperate the line into tokens and store them in COMMAND array
         setCommandFromString(line);
+        if (!checkLastCharOfCommand()) {
+            printf("The command must end with ';'.\n");
+            continue;
+        }
         // Process command
         CreateBookingFromCommand(fd);
         // printf("= %s %s %s %s\n", COMMAND[0], COMMAND[1], COMMAND[2], COMMAND[3]);
@@ -1079,12 +1150,16 @@ int main() {
     printf("~~ WELCOME TO PolyU ~~\n");
     while (true) { 
         printf("====================================\n");
-        printf("Please enter booking: "); 
+        printf("Please enter booking:\n"); 
         
         // get input (typed in by user)
         char line[100];
         scanf(" %[^\n]", line); 
-        setCommandFromString(line); 
+        setCommandFromString(line);
+        if (!checkLastCharOfCommand()) {
+            printf("The command must end with ';'.\n");
+            continue;
+        }
         
         printf("\n");
          
@@ -1119,7 +1194,7 @@ int main() {
                 else if (strcmp(COMMAND[1], "-ALL") == 0) {
                     write(fd[1], "AL", 3);  
                 } else {
-                    printf("invalid command\n");
+                    printf("Invalid command\n");
                 }
             } else if (
             strcmp(COMMAND[0], "addEvent") == 0 ||
@@ -1129,7 +1204,7 @@ int main() {
                 CreateBookingFromCommand(fd[1]);
                 freeBookings(); // Free bookings for child
             } else {
-                printf("invalid command, must be one of the following:\n");
+                printf("Invalid command, must be one of the following:\n");
                 printf("endProgram, addBatch, printBookings, addEvent, addParking, addParking, bookEssentials\n");
                 write(fd[1], "invalid", 7);  
             }
@@ -1186,6 +1261,7 @@ int main() {
 
                     if (newBooking->num != 0) {
                         cancelBookings(newBooking);
+                        tryRestore(newBooking); // Try to restore unnecessary evicted bookings
                     }
  
                     // DEBUG
@@ -1242,6 +1318,17 @@ bool isCorrectArgCount(int count) {
     if (i == count) {
         return true;
     }
-    printf("input error: wrong argument count for %s, expected %d, received %d\n", COMMAND[0], count-1, i-1);
+    printf("Input error: wrong argument count for %s, expected %d, received %d\n", COMMAND[0], count-1, i-1);
+    return false;
+}
+
+// arg count validation in command array
+bool isCorrectArgCountForParking(int count1, int count2) {
+    int i = 0;
+    while (COMMAND[i][0] != '\0') i++;
+    if (i == count1 || i == count2) {
+        return true;
+    }
+    printf("Input error: wrong argument count for %s, expected %d or %d, received %d\n", COMMAND[0], count1-1, count2-1, i-1);
     return false;
 }
