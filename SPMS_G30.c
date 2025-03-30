@@ -14,6 +14,7 @@
 typedef struct bookingInfo {
     int startTime; // YYYYMMDDHH
     int endTime; // YYYYMMDDHH
+    int duration; // Duration (integer hours)
     int member; // Member A to E (1 - 5)
     int priority; // Priority (1: Event, 2: Reservation, 3: Parking, 4: Essentials)
     bool essentials[7]; // Essentials reserved (Lockers, Umbrellas, Batteries, Cables, Valet parking, Inflation services, normal parking) (1 = Reserved) (e.g. 110010 = Locker, Umbrella, and Valet parking reserved)
@@ -517,6 +518,7 @@ bookingInfo *handleCreateBooking()
         return NULL;
     }
     newBooking->endTime = addDurationToTime(newBooking->startTime, dur);
+    newBooking->duration = dur;
 
     int i;
     // Convert priority and essentials to integer
@@ -659,8 +661,8 @@ void CreateBookingFromCommand(int fd)
         char *essentialsString = convertEssentialsToString(newBooking->essentials);
 
         printf("-> [Done!]\n");
-        sprintf(buff, "done %d %d %d %d %s %d %d %d %d %d ",
-                newBooking->startTime, newBooking->endTime, newBooking->member,
+        sprintf(buff, "done %d %d %d %d %d %s %d %d %d %d %d ",
+                newBooking->startTime, newBooking->endTime, newBooking->duration, newBooking->member,
                 newBooking->priority, essentialsString, (int)newBooking->fAccepted,
                 (int)newBooking->pAccepted, (int)newBooking->oAccepted, newBooking->bookingID, newBooking->num);
         int i;
@@ -1040,7 +1042,36 @@ int totalAcceptedCount(int acceptedType)
     return count;
 }
 
-int utilizationCount(int essentialType, int acceptedType)
+// Calculation of total time slot assigned
+int calTimeSlot(int acceptedType)
+{
+    int count = 0;
+    bookingInfo *cur = head;
+
+    bool accepted;
+    while (cur != NULL) {
+        switch (acceptedType) {
+            case 1:
+                accepted = cur->fAccepted;
+                break;
+            case 2:
+                accepted = cur->pAccepted;
+                break;
+            case 3:
+                accepted = cur->oAccepted;
+                break;
+        }
+        if (accepted) {
+            count += cur->duration;
+        }
+        cur = cur->next;
+    }
+
+    return count;
+}
+
+// Calculation of utilization
+int calUtilization(int essentialType, int acceptedType)
 {
     int count = 0;
     bookingInfo *cur = head;
@@ -1060,7 +1091,7 @@ int utilizationCount(int essentialType, int acceptedType)
         }
         if (accepted) {
             if (cur->essentials[essentialType]) {
-                count++;
+                count += cur->duration;
             }
         }
         cur = cur->next;
@@ -1083,7 +1114,7 @@ void printReport()
     fprintf(fd, "*** Parking Booking Manager - Summary Report ***\n");
     fprintf(fd, "\nPerformance:\n");
     fprintf(fd, "\nFor FCFS:\n");
-    int totalRequest, totalReceived, totalAccepted, totalRejected, utilization;
+    int totalRequest, totalReceived, totalAccepted, totalRejected, utilization, utilizationTime;
     totalReceived = totalReceivedCount();
     totalRequest = totalReceived + invalidCount;
     totalAccepted = totalAcceptedCount(1); // 1 for FCFS
@@ -1094,8 +1125,9 @@ void printReport()
     fprintf(fd, "\n\tUtilization of Time Slot:\n");
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
-        utilization = utilizationCount(i, 1); // 1 for FCFS
-        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
+        utilization = calUtilization(i, 1); // 1 for FCFS
+        utilizationTime = calTimeSlot(1); // 1 for FCFS
+        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / utilizationTime * 100);
     }
     fprintf(fd, "\n\tInvalid request(s) made: %d\n", invalidCount);
 
@@ -1108,8 +1140,9 @@ void printReport()
     fprintf(fd, "\n\tUtilization of Time Slot:\n");
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
-        utilization = utilizationCount(i, 2); // 2 for Priority
-        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
+        utilization = calUtilization(i, 2); // 2 for Priority
+        utilizationTime = calTimeSlot(2); // 2 for Priority
+        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / utilizationTime * 100);
     }
     fprintf(fd, "\n\tInvalid request(s) made: %d\n", invalidCount);
 
@@ -1122,8 +1155,9 @@ void printReport()
     fprintf(fd, "\n\tUtilization of Time Slot:\n");
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
-        utilization = utilizationCount(i, 3); // 3 for Optimized
-        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / totalAccepted * 100);
+        utilization = calUtilization(i, 3); // 3 for Optimized
+        utilizationTime = calTimeSlot(3); // 3 for Optimized
+        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / utilizationTime * 100);
     }
     fprintf(fd, "\n\tInvalid request(s) made: %d\n", invalidCount);
 
@@ -1226,13 +1260,13 @@ int main() {
                     char essentialsString[8]; // 8 is because the size of written essentialsString is 8 (including '\0')
                     int fA, pA, oA; // Use int to read values for bool with sscanf to avoid compile warnings
                     int i;
-                    sscanf(buff + 5, "%d %d %d %d %s %d %d %d %d %d", // buff + 5 is to skip "done "
-                        &newBooking->startTime, &newBooking->endTime, &newBooking->member,
+                    sscanf(buff + 5, "%d %d %d %d %d %s %d %d %d %d %d", // buff + 5 is to skip "done "
+                        &newBooking->startTime, &newBooking->endTime, &newBooking->duration, &newBooking->member,
                         &newBooking->priority, essentialsString, &fA, &pA, &oA, &newBooking->bookingID, &newBooking->num);
                     if (newBooking->num != 0) { // If there exists overwrittenIDs
                         newBooking->overwrittenIDs = malloc(newBooking->num * sizeof(int)); // Allocate memory for overwrittenIDs
                         char *token = strtok(buff, " "); // Split the buff by " "
-                        for (i = 0; i < 10; i++) { // Skip the first 10 tokens
+                        for (i = 0; i < 11; i++) { // Skip the first 11 tokens
                             token = strtok(NULL, " ");
                         }
     
