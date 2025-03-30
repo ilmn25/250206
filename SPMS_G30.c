@@ -1089,8 +1089,8 @@ void printReport()
     totalAccepted = totalAcceptedCount(1); // 1 for FCFS
     totalRejected = totalReceived - totalAccepted;
     fprintf(fd, "\tTotal Number of Bookings Received: %d (%.1f%%)\n", totalReceived, (float)totalReceived / totalRequest * 100);
-    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
-    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalReceived * 100);
+    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalReceived * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
@@ -1103,8 +1103,8 @@ void printReport()
     totalAccepted = totalAcceptedCount(2); // 2 for Priority
     totalRejected = totalReceived - totalAccepted;
     fprintf(fd, "\tTotal Number of Bookings Received: %d (%.1f%%)\n", totalReceived, (float)totalReceived / totalRequest * 100);
-    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
-    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalReceived * 100);
+    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalReceived * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
@@ -1117,8 +1117,8 @@ void printReport()
     totalAccepted = totalAcceptedCount(3); // 3 for Optimized
     totalRejected = totalReceived - totalAccepted;
     fprintf(fd, "\tTotal Number of Bookings Received: %d (%.1f%%)\n", totalReceived, (float)totalReceived / totalRequest * 100);
-    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalRequest * 100);
-    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalRequest * 100);
+    fprintf(fd, "\t\t Number of Bookings Assigned: %d (%.1f%%)\n", totalAccepted, (float)totalAccepted / totalReceived * 100);
+    fprintf(fd, "\t\t Number of Bookings Rejected: %d (%.1f%%)\n", totalRejected, (float)totalRejected / totalReceived * 100);
     fprintf(fd, "\n\t Utilization of Time Slot:\n");
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
