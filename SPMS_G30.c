@@ -697,11 +697,14 @@ void addBatch(const char *filename, int fd)
         printf("----------------\n> %s\n", line);
         // Seperate the line into tokens and store them in COMMAND array
         setCommandFromString(line);
-        if (!checkLastCharOfCommand()) {
-            printf("The command must end with ';'.\n");
-            write(fd, "invalid", 7); // Tell parent that booking invalid
-            continue;
-        }
+
+        // WILL CAUSE BUG WHEN THE BATCH FILE CONTAINS INVALID COMMANDS!!!
+        // if (!checkLastCharOfCommand()) {
+        //     printf("The command must end with ';'.\n");
+        //     write(fd, "invalid", 7); // Tell parent that booking invalid
+        //     continue;
+        // }
+
         // Process command
         CreateBookingFromCommand(fd);
         // printf("= %s %s %s %s\n", COMMAND[0], COMMAND[1], COMMAND[2], COMMAND[3]);
@@ -1042,35 +1045,24 @@ int totalAcceptedCount(int acceptedType)
     return count;
 }
 
-// Calculation of total time slot assigned
-int calTimeSlot(int acceptedType)
+// Calculation of the requested time for specific essential
+int calRequestedTime(int essentialType)
 {
     int count = 0;
     bookingInfo *cur = head;
 
-    bool accepted;
     while (cur != NULL) {
-        switch (acceptedType) {
-            case 1:
-                accepted = cur->fAccepted;
-                break;
-            case 2:
-                accepted = cur->pAccepted;
-                break;
-            case 3:
-                accepted = cur->oAccepted;
-                break;
-        }
-        if (accepted) {
+        if (cur->essentials[essentialType]) {
             count += cur->duration;
         }
         cur = cur->next;
     }
 
+    if (count == 0) count++; // Avoid division by zero
     return count;
 }
 
-// Calculation of utilization
+// Calculation of the utilization for specific essential
 int calUtilization(int essentialType, int acceptedType)
 {
     int count = 0;
@@ -1114,7 +1106,12 @@ void printReport()
     fprintf(fd, "*** Parking Booking Manager - Summary Report ***\n");
     fprintf(fd, "\nPerformance:\n");
     fprintf(fd, "\nFor FCFS:\n");
-    int totalRequest, totalReceived, totalAccepted, totalRejected, utilization, utilizationTime;
+    int totalRequest, totalReceived, totalAccepted, totalRejected, utilization;
+    // Calculate the requested time for each essential
+    int requestedTime[6];
+    for (i = 0; i < 6; i++) {
+        requestedTime[i] = calRequestedTime(i);
+    }
     totalReceived = totalReceivedCount();
     totalRequest = totalReceived + invalidCount;
     totalAccepted = totalAcceptedCount(1); // 1 for FCFS
@@ -1126,8 +1123,7 @@ void printReport()
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
         utilization = calUtilization(i, 1); // 1 for FCFS
-        utilizationTime = calTimeSlot(1); // 1 for FCFS
-        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / utilizationTime * 100);
+        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / requestedTime[i] * 100);
     }
     fprintf(fd, "\n\tInvalid request(s) made: %d\n", invalidCount);
 
@@ -1141,8 +1137,7 @@ void printReport()
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
         utilization = calUtilization(i, 2); // 2 for Priority
-        utilizationTime = calTimeSlot(2); // 2 for Priority
-        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / utilizationTime * 100);
+        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / requestedTime[i] * 100);
     }
     fprintf(fd, "\n\tInvalid request(s) made: %d\n", invalidCount);
 
@@ -1156,8 +1151,7 @@ void printReport()
     // Print the utilization of each essential type
     for (i = 0; i < 6; i++) {
         utilization = calUtilization(i, 3); // 3 for Optimized
-        utilizationTime = calTimeSlot(3); // 3 for Optimized
-        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / utilizationTime * 100);
+        fprintf(fd, "\n\t      %s - %.1f%%\n", essentialsName[i], (float)utilization / requestedTime[i] * 100);
     }
     fprintf(fd, "\n\tInvalid request(s) made: %d\n", invalidCount);
 
