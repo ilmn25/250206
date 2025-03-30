@@ -47,8 +47,7 @@ bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int
 void EvictEssential(bookingInfo *targetBooking);
 bool isAvailableFCFS(bookingInfo *targetBooking);
 bool isAvailablePR(bookingInfo *targetBooking);
-bool isCorrectArgCount(int count);
-bool isCorrectArgCountForParking(int count1, int count2);
+int argCount();
 bookingInfo *handleCreateBooking();
 void setCommandFromString(char input[]);
 void CreateBookingFromCommand(int fd);
@@ -537,7 +536,7 @@ bookingInfo *handleCreateBooking()
             free(newBooking);
             return NULL;
         }
-        if (!isCorrectArgCount(8)) {
+        if (argCount() != 8) {
             free(newBooking);
             return NULL;
         }
@@ -553,7 +552,7 @@ bookingInfo *handleCreateBooking()
             free(newBooking);
             return NULL;
         }
-        if (!isCorrectArgCount(7)) {
+        if (argCount() != 6 && argCount() != 7) {
             free(newBooking);
             return NULL;
         }
@@ -569,7 +568,7 @@ bookingInfo *handleCreateBooking()
             free(newBooking);
             return NULL;
         }
-        if (!isCorrectArgCountForParking(5, 7)) {
+        if (argCount() != 5 && argCount() != 6 && argCount() != 7) {
             free(newBooking);
             return NULL;
         }
@@ -583,7 +582,7 @@ bookingInfo *handleCreateBooking()
             free(newBooking);
             return NULL;
         }
-        if (!isCorrectArgCount(6)) {
+        if (argCount() != 6) {
             free(newBooking);
             return NULL;
         }
@@ -1309,24 +1308,9 @@ int main() {
     return 0;
 }
 
-// arg count validation in command array
-bool isCorrectArgCount(int count) {
-    int i = 0;
-    while (COMMAND[i][0] != '\0') i++;
-    if (i == count) {
-        return true;
-    }
-    printf("Input error: wrong argument count for %s, expected %d, received %d\n", COMMAND[0], count-1, i-1);
-    return false;
-}
-
-// arg count validation in command array
-bool isCorrectArgCountForParking(int count1, int count2) {
-    int i = 0;
-    while (COMMAND[i][0] != '\0') i++;
-    if (i == count1 || i == count2) {
-        return true;
-    }
-    printf("Input error: wrong argument count for %s, expected %d or %d, received %d\n", COMMAND[0], count1-1, count2-1, i-1);
-    return false;
+// Calculate the argument count
+int argCount() {
+    int count = 0;
+    while (COMMAND[count][0] != '\0') count++;
+    return count;
 }
