@@ -444,7 +444,6 @@ bool isAvailableFCFS(bookingInfo *targetBooking)
 
 bool isAvailablePR(bookingInfo *targetBooking) 
 {
-    printf("\nChecking isAvailable for booking ID: %d\n", targetBooking->bookingID);
     if (targetBooking->essentials[6] && !isAvailableEssential(targetBooking, 6, 10, 1)) {
         return false; // parking is overbooked
     }
