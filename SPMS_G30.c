@@ -537,7 +537,7 @@ bookingInfo *handleCreateBooking()
             return NULL;
         }
         if (argCount() != 8) {
-            printf("Input error: wrong argument count for %s, expected 8, received %d\n", COMMAND[0], argCount());
+            printf("Input error: wrong argument count for %s, expected 7, received %d\n", COMMAND[0], argCount() - 1);
             free(newBooking);
             return NULL;
         }
@@ -554,7 +554,7 @@ bookingInfo *handleCreateBooking()
             return NULL;
         }
         if (argCount() != 6 && argCount() != 7) {
-            printf("Input error: wrong argument count for %s, expected 6 or 7, received %d\n", COMMAND[0], argCount());
+            printf("Input error: wrong argument count for %s, expected 5 or 6, received %d\n", COMMAND[0], argCount() - 1);
             free(newBooking);
             return NULL;
         }
@@ -571,7 +571,7 @@ bookingInfo *handleCreateBooking()
             return NULL;
         }
         if (argCount() != 5 && argCount() != 6 && argCount() != 7) {
-            printf("Input error: wrong argument count for %s, expected 5 or 6 or 7, received %d\n", COMMAND[0], argCount());
+            printf("Input error: wrong argument count for %s, expected 4 or 5 or 6, received %d\n", COMMAND[0], argCount() - 1);
             free(newBooking);
             return NULL;
         }
@@ -586,7 +586,7 @@ bookingInfo *handleCreateBooking()
             return NULL;
         }
         if (argCount() != 6) {
-            printf("Input error: wrong argument count for %s, expected 6, received %d\n", COMMAND[0], argCount());
+            printf("Input error: wrong argument count for %s, expected 5, received %d\n", COMMAND[0], argCount() - 1);
             free(newBooking);
             return NULL;
         }
