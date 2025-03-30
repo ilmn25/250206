@@ -697,6 +697,7 @@ void addBatch(const char *filename, int fd)
         setCommandFromString(line);
         if (!checkLastCharOfCommand()) {
             printf("The command must end with ';'.\n");
+            write(fd, "invalid", 7); // Tell parent that booking invalid
             continue;
         }
         // Process command
@@ -1159,6 +1160,7 @@ int main() {
         setCommandFromString(line);
         if (!checkLastCharOfCommand()) {
             printf("The command must end with ';'.\n");
+            invalidCount++;
             continue;
         }
         
