@@ -806,7 +806,7 @@ void addBatch(const char *filename, int fd)
 
         // Process command
         CreateBookingFromCommand(fd);
-        usleep(10); // Sleep for 10 microseconds to allow time for the parent process to read the booking information and synchronize properly
+        usleep(20); // Sleep for 20 microseconds to allow time for the parent process to read the booking information and synchronize properly
         // printf("= %s %s %s %s\n", COMMAND[0], COMMAND[1], COMMAND[2], COMMAND[3]);
     }
 
