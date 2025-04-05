@@ -41,7 +41,7 @@ bookingInfo *head = NULL;
 
 void insertIntoBookings(bookingInfo **head, bookingInfo *newBooking);
 int getEssentialSum(bool *essentials);
-void handleSetEssentials(bool *essentials, const char *command, bool includePaired);
+void handleSetEssentials(bool *essentials, char *command, bool includePaired);
 int addDurationToTime(int time, int duration);
 bool isMorePriorityThan(bookingInfo *bookingA, bookingInfo *bookingB, bool includeSame);
 bool isAvailableEssential(bookingInfo *targetBooking, int target, int limit, int mode);
@@ -130,10 +130,18 @@ int getEssentialSum(bool *essentials)
     }
     return count;
 }
-
+void convertToLower(char *str) {
+    while (*str) {
+        if (*str >= 'A' && *str <= 'Z') {
+            *str += ('a' - 'A');  
+        }
+        str++;
+    }
+}
 // take string parameters in COMMAND[] and set the 1 and 0s 
-void handleSetEssentials(bool *essentials, const char *command, bool includePaired) 
+void handleSetEssentials(bool *essentials, char *command, bool includePaired) 
 {
+    convertToLower(command);
     // printf("essential to add: %s\n", command);
     if (strstr(command, "normalpark") != NULL) {
         essentials[6] = true;
@@ -154,7 +162,7 @@ void handleSetEssentials(bool *essentials, const char *command, bool includePair
         essentials[3] = true;
         if (includePaired) essentials[2] = true;
     }
-    else if (strstr(command, "valetpark") != NULL) {
+    else if (strstr(command, "valet") != NULL) {
         essentials[4] = true;
         if (includePaired) essentials[5] = true;
     }
@@ -479,15 +487,15 @@ bookingInfo *handleCreateBooking()
     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
     
     // Convert the member to integer
-    if (strcmp(COMMAND[1] + 1, "member_A") == 0) {
+    if (strcasecmp(COMMAND[1] + 1, "member_A") == 0) {
         newBooking->member = 1;
-    } else if (strcmp(COMMAND[1] + 1, "member_B") == 0) {
+    } else if (strcasecmp(COMMAND[1] + 1, "member_B") == 0) {
         newBooking->member = 2;
-    } else if (strcmp(COMMAND[1] + 1, "member_C") == 0) {
+    } else if (strcasecmp(COMMAND[1] + 1, "member_C") == 0) {
         newBooking->member = 3;
-    } else if (strcmp(COMMAND[1] + 1, "member_D") == 0) {
+    } else if (strcasecmp(COMMAND[1] + 1, "member_D") == 0) {
         newBooking->member = 4;
-    } else if (strcmp(COMMAND[1] + 1, "member_E") == 0) {
+    } else if (strcasecmp(COMMAND[1] + 1, "member_E") == 0) {
         newBooking->member = 5;
     } else {
         printf("Invalid member\n");
@@ -525,7 +533,7 @@ bookingInfo *handleCreateBooking()
     for (i = 0; i < 7; i++) {
         newBooking->essentials[i] = false;
     }
-    if (strcmp(COMMAND[0], "addEvent") == 0) {
+    if (strcasecmp(COMMAND[0], "addEvent") == 0) {
         newBooking->priority = 1;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
 
@@ -533,18 +541,18 @@ bookingInfo *handleCreateBooking()
         handleSetEssentials(newBooking->essentials, COMMAND[6], false);
         handleSetEssentials(newBooking->essentials, COMMAND[7], false); 
         // printf("Essentials: %s\n", newBooking->essentials);
-        if (getEssentialSum(newBooking->essentials) != 3) {
-            printf("Invalid essentials format: need exactly 3 essentials to be booked\n");
-            free(newBooking);
-            return NULL;
-        }
+        // if (getEssentialSum(newBooking->essentials) != 3) {
+        //     printf("Invalid essentials format: need exactly 3 essentials to be booked\n");
+        //     free(newBooking);
+        //     return NULL;
+        // }
         if (argCount() != 8) {
             printf("Input error: wrong argument count for %s, expected 7, received %d\n", COMMAND[0], argCount() - 1);
             free(newBooking);
             return NULL;
         }
 
-    } else if (strcmp(COMMAND[0], "addReservation") == 0) {
+    } else if (strcasecmp(COMMAND[0], "addReservation") == 0) {
         newBooking->priority = 2;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
 
@@ -561,7 +569,7 @@ bookingInfo *handleCreateBooking()
             return NULL;
         }
 
-    } else if (strcmp(COMMAND[0], "addParking") == 0) {
+    } else if (strcasecmp(COMMAND[0], "addParking") == 0) {
         newBooking->priority = 3;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
 
@@ -578,7 +586,7 @@ bookingInfo *handleCreateBooking()
             return NULL;
         }
 
-    } else if (strcmp(COMMAND[0], "bookEssentials") == 0) {
+    } else if (strcasecmp(COMMAND[0], "bookEssentials") == 0) {
         newBooking->priority = 4;
 
         handleSetEssentials(newBooking->essentials, COMMAND[5], false);
@@ -1208,30 +1216,30 @@ int main() {
         else if (pid == 0) { 
             close(fd[0]); // Close child in 
             // Write
-            if (strcmp(COMMAND[0], "endProgram") == 0) {
+            if (strcasecmp(COMMAND[0], "endProgram") == 0) {
                 write(fd[1], "end", 3); // Tell parent to end the program
-            } else if (strcmp(COMMAND[0], "addBatch") == 0) { 
+            } else if (strcasecmp(COMMAND[0], "addBatch") == 0) { 
                 addBatch(COMMAND[1], fd[1]); 
-            } else if (strcmp(COMMAND[0], "printBookings") == 0) { // Tell parent to print bookings
-                if (strcmp(COMMAND[1] + 1, "fcfs") == 0) {
+            } else if (strcasecmp(COMMAND[0], "printBookings") == 0) { // Tell parent to print bookings
+                if (strcasecmp(COMMAND[1] + 1, "fcfs") == 0) {
                     write(fd[1], "FC", 3);  
                 }
-                else if (strcmp(COMMAND[1] + 1, "prio") == 0) {
+                else if (strcasecmp(COMMAND[1] + 1, "prio") == 0) {
                     write(fd[1], "PR", 3);  
                 }
-                else if (strcmp(COMMAND[1] + 1, "opti") == 0) {
+                else if (strcasecmp(COMMAND[1] + 1, "opti") == 0) {
                     write(fd[1], "OP", 3);  
                 } 
-                else if (strcmp(COMMAND[1] + 1, "ALL") == 0) {
+                else if (strcasecmp(COMMAND[1] + 1, "ALL") == 0) {
                     write(fd[1], "AL", 3);  
                 } else {
                     printf("Invalid command\n");
                 }
             } else if (
-            strcmp(COMMAND[0], "addEvent") == 0 ||
-            strcmp(COMMAND[0], "addReservation") == 0 ||
-            strcmp(COMMAND[0], "addParking") == 0 ||
-            strcmp(COMMAND[0], "bookEssentials") == 0 ) {  
+            strcasecmp(COMMAND[0], "addEvent") == 0 ||
+            strcasecmp(COMMAND[0], "addReservation") == 0 ||
+            strcasecmp(COMMAND[0], "addParking") == 0 ||
+            strcasecmp(COMMAND[0], "bookEssentials") == 0 ) {  
                 CreateBookingFromCommand(fd[1]);
                 freeBookings(); // Free bookings for child
             } else {
