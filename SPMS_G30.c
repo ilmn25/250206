@@ -584,6 +584,11 @@ bookingInfo *handleCreateBooking()
         free(newBooking);
         return NULL;
     }
+    if (dur == 0) {
+        printf("Invalid duration time: expected time > 0 hours\n");
+        free(newBooking);
+        return NULL;
+    }
     newBooking->endTime = addDurationToTime(newBooking->startTime, dur);
     newBooking->duration = dur;
 
