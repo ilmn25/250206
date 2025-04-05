@@ -479,15 +479,15 @@ bookingInfo *handleCreateBooking()
     bookingInfo *newBooking = (bookingInfo *)malloc(sizeof(bookingInfo));
     
     // Convert the member to integer
-    if (strcmp(COMMAND[1], "-member_A") == 0) {
+    if (strcmp(COMMAND[1] + 1, "member_A") == 0) {
         newBooking->member = 1;
-    } else if (strcmp(COMMAND[1], "-member_B") == 0) {
+    } else if (strcmp(COMMAND[1] + 1, "member_B") == 0) {
         newBooking->member = 2;
-    } else if (strcmp(COMMAND[1], "-member_C") == 0) {
+    } else if (strcmp(COMMAND[1] + 1, "member_C") == 0) {
         newBooking->member = 3;
-    } else if (strcmp(COMMAND[1], "-member_D") == 0) {
+    } else if (strcmp(COMMAND[1] + 1, "member_D") == 0) {
         newBooking->member = 4;
-    } else if (strcmp(COMMAND[1], "-member_E") == 0) {
+    } else if (strcmp(COMMAND[1] + 1, "member_E") == 0) {
         newBooking->member = 5;
     } else {
         printf("Invalid member\n");
@@ -1213,16 +1213,16 @@ int main() {
             } else if (strcmp(COMMAND[0], "addBatch") == 0) { 
                 addBatch(COMMAND[1], fd[1]); 
             } else if (strcmp(COMMAND[0], "printBookings") == 0) { // Tell parent to print bookings
-                if (strcmp(COMMAND[1], "-fcfs") == 0) {
+                if (strcmp(COMMAND[1] + 1, "fcfs") == 0) {
                     write(fd[1], "FC", 3);  
                 }
-                else if (strcmp(COMMAND[1], "-prio") == 0) {
+                else if (strcmp(COMMAND[1] + 1, "prio") == 0) {
                     write(fd[1], "PR", 3);  
                 }
-                else if (strcmp(COMMAND[1], "-opti") == 0) {
+                else if (strcmp(COMMAND[1] + 1, "opti") == 0) {
                     write(fd[1], "OP", 3);  
                 } 
-                else if (strcmp(COMMAND[1], "-ALL") == 0) {
+                else if (strcmp(COMMAND[1] + 1, "ALL") == 0) {
                     write(fd[1], "AL", 3);  
                 } else {
                     printf("Invalid command\n");
