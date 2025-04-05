@@ -130,6 +130,7 @@ int getEssentialSum(bool *essentials)
     }
     return count;
 }
+
 void convertToLower(char *str) {
     while (*str) {
         if (*str >= 'A' && *str <= 'Z') {
@@ -138,10 +139,68 @@ void convertToLower(char *str) {
         str++;
     }
 }
+
+bool duplicateEssentials() {
+    int i;
+    bool containsEssential[6];
+    // Convert the essentials to lower case
+    for (i = 5; i < 10; i++) {
+        convertToLower(COMMAND[i]);
+        if (strstr(COMMAND[i], "locker") != NULL) {
+            if (!containsEssential[0]) {
+                containsEssential[0] = true;
+            }
+            else {
+                return true;
+            }
+        }
+        if (strstr(COMMAND[i], "umbrella") != NULL) {
+            if (!containsEssential[1]) {
+                containsEssential[1] = true;
+            }
+            else {
+                return true;
+            }
+        }
+        if (strstr(COMMAND[i], "battery") != NULL) {
+            if (!containsEssential[2]) {
+                containsEssential[2] = true;
+            }
+            else {
+                return true;
+            }
+        }
+        if (strstr(COMMAND[i], "cable") != NULL) {
+            if (!containsEssential[3]) {
+                containsEssential[3] = true;
+            }
+            else {
+                return true;
+            }
+        }
+        if (strstr(COMMAND[i], "valet") != NULL) {
+            if (!containsEssential[4]) {
+                containsEssential[4] = true;
+            }
+            else {
+                return true;
+            }
+        }
+        if (strstr(COMMAND[i], "inflationservice") != NULL) {
+            if (!containsEssential[5]) {
+                containsEssential[5] = true;
+            }
+            else {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // take string parameters in COMMAND[] and set the 1 and 0s 
 void handleSetEssentials(bool *essentials, char *command, bool includePaired) 
 {
-    convertToLower(command);
     // printf("essential to add: %s\n", command);
     if (strstr(command, "normalpark") != NULL) {
         essentials[6] = true;
@@ -537,6 +596,11 @@ bookingInfo *handleCreateBooking()
         newBooking->priority = 1;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
 
+        if (duplicateEssentials()) {
+            printf("Input error: duplicate essential\n");
+            free(newBooking);
+            return NULL;
+        }
         handleSetEssentials(newBooking->essentials, COMMAND[5], false);
         handleSetEssentials(newBooking->essentials, COMMAND[6], false);
         handleSetEssentials(newBooking->essentials, COMMAND[7], false); 
@@ -546,8 +610,8 @@ bookingInfo *handleCreateBooking()
         //     free(newBooking);
         //     return NULL;
         // }
-        if (argCount() != 8) {
-            printf("Input error: wrong argument count for %s, expected 7, received %d\n", COMMAND[0], argCount() - 1);
+        if (argCount() != 5 && argCount() != 6 && argCount() != 7 && argCount() != 8) {
+            printf("Input error: wrong argument count for %s, expected 4 or 5 or 6 or 7, received %d\n", COMMAND[0], argCount() - 1);
             free(newBooking);
             return NULL;
         }
@@ -556,6 +620,11 @@ bookingInfo *handleCreateBooking()
         newBooking->priority = 2;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
 
+        if (duplicateEssentials()) {
+            printf("Input error: duplicate essential\n");
+            free(newBooking);
+            return NULL;
+        }
         handleSetEssentials(newBooking->essentials, COMMAND[5], true);
         handleSetEssentials(newBooking->essentials, COMMAND[6], true);
         if (getEssentialSum(newBooking->essentials) != 2) {
@@ -573,6 +642,11 @@ bookingInfo *handleCreateBooking()
         newBooking->priority = 3;
         handleSetEssentials(newBooking->essentials, "normalpark", false);
 
+        if (duplicateEssentials()) {
+            printf("Input error: duplicate essential\n");
+            free(newBooking);
+            return NULL;
+        }
         handleSetEssentials(newBooking->essentials, COMMAND[5], true);
         handleSetEssentials(newBooking->essentials, COMMAND[6], true);
         if (getEssentialSum(newBooking->essentials) != 2 && getEssentialSum(newBooking->essentials) != 0) {
@@ -589,14 +663,20 @@ bookingInfo *handleCreateBooking()
     } else if (strcasecmp(COMMAND[0], "bookEssentials") == 0) {
         newBooking->priority = 4;
 
-        handleSetEssentials(newBooking->essentials, COMMAND[5], false);
-        if (getEssentialSum(newBooking->essentials) != 1) {
-            printf("Invalid essentials format: need at exactly 1 valid essential only\n");
+        if (duplicateEssentials()) {
+            printf("Input error: duplicate essential\n");
             free(newBooking);
             return NULL;
         }
-        if (argCount() != 6) {
-            printf("Input error: wrong argument count for %s, expected 5, received %d\n", COMMAND[0], argCount() - 1);
+        handleSetEssentials(newBooking->essentials, COMMAND[5], false);
+        handleSetEssentials(newBooking->essentials, COMMAND[6], false);
+        // if (getEssentialSum(newBooking->essentials) != 1) {
+        //     printf("Invalid essentials format: need at exactly 1 valid essential only\n");
+        //     free(newBooking);
+        //     return NULL;
+        // }
+        if (argCount() != 6 && argCount() != 7) {
+            printf("Input error: wrong argument count for %s, expected 5 or 6, received %d\n", COMMAND[0], argCount() - 1);
             free(newBooking);
             return NULL;
         }
@@ -715,6 +795,7 @@ void addBatch(const char *filename, int fd)
 
         // Process command
         CreateBookingFromCommand(fd);
+        usleep(10); // Sleep for 10 microseconds to allow time for the parent process to read the booking information and synchronize properly
         // printf("= %s %s %s %s\n", COMMAND[0], COMMAND[1], COMMAND[2], COMMAND[3]);
     }
 
