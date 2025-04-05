@@ -143,6 +143,12 @@ void convertToLower(char *str) {
 bool duplicateEssentials() {
     int i;
     bool containsEssential[6];
+
+    // Initialize the containsEssential to false
+    for (i = 0; i < 6; i++) {
+        containsEssential[i] = false;
+    }
+
     // Convert the essentials to lower case
     for (i = 5; i < 10; i++) {
         convertToLower(COMMAND[i]);
